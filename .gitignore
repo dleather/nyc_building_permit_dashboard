@@ -45,3 +45,7 @@ env/
 # Secret environment/config files
 .env
 .env.*
+
+# Codeweaver
+codebase.md
+run_codeweaver.bat
