@@ -154,7 +154,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Author
 
-Created by [David Leather](https://daveleather.com). Explore more of my work and connect with me on [GitHub](https://github.com/yourusername).
+Created by [David Leather](https://daveleather.com). Explore more of my work and connect with me on [GitHub](https://github.com/dleather).
 
 ---
 
