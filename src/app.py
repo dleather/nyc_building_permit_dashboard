@@ -1,25 +1,27 @@
 from dash import Dash
 import dash_bootstrap_components as dbc
 from asgiref.wsgi import WsgiToAsgi
+import logging
 
-# Initialize the Dash app
-app = Dash(
-    __name__,
-    external_stylesheets=[dbc.themes.LUX],
-    suppress_callback_exceptions=True
+# Set up logging before any other imports
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    force=True  # This ensures we override any existing logging config
 )
-server = app.server  # Expose server for production deployment
 
-# Import and set the layout
+logger = logging.getLogger(__name__)
+logger.info("=== Starting app.py ===")
+
+from src.app_instance import app, server
 from src.layout import layout
 app.layout = layout
-
-# Import callbacks (this registers them)
 from src import callbacks
 
-# Create ASGI app from WSGI app
-asgi_app = WsgiToAsgi(server)
+# Import callbacks (this registers them)
+#asgi_app = WsgiToAsgi(server)
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("src.app:asgi_app", host="127.0.0.1", port=8000, reload=True) 
+    app.run_server(debug=True, port=8050)
+    #import uvicorn
+    #uvicorn.run("src.app:asgi_app", host="127.0.0.1", port=8000, reload=True) 

@@ -1,8 +1,11 @@
 # src/callbacks.py
 
 from dash.dependencies import Input, Output, State
-from dash import dash, no_update
-from src.app import app
+import dash
+from dash import no_update, html
+from src.app_instance import app
+from src.data_utils import permit_options
+import logging
 
 # Plotly for the time-series figure:
 import plotly.express as px
@@ -22,14 +25,21 @@ import pandas as pd
 # or some other dataset to plot in the time-series
 from src.data_utils import permit_counts_wide
 
+logger = logging.getLogger(__name__)
+
+# Add this to your layout somewhere
+debug_div = html.Div([
+    html.Pre(id='debug-output', style={'whiteSpace': 'pre-wrap'}),
+], style={'display': 'none'})  # Set to 'block' to see debug output
 
 # ------------------------------------------------------------------------------
 # 1) TIME-SERIES: BRUSH -> UPDATE GLOBAL_FILTER (startQuarterIndex, endQuarterIndex)
 # ------------------------------------------------------------------------------
 @app.callback(
-    Output("global_filter", "data"),
+    Output("global_filter", "data", allow_duplicate=True),
     Input("time-series", "selectedData"),       # Brushing on the time-series
-    State("global_filter", "data")
+    State("global_filter", "data"),
+    prevent_initial_call=True
 )
 def update_time_range_from_timeseries(selected_data, global_filter):
     """
@@ -66,9 +76,10 @@ def update_time_range_from_timeseries(selected_data, global_filter):
 # 2) PERMIT TYPE RADIO -> UPDATE PERMIT TYPE IN GLOBAL_FILTER
 # ------------------------------------------------------------------------------
 @app.callback(
-    Output("global_filter", "data"),
+    Output("global_filter", "data", allow_duplicate=True),
     Input("permit-type", "value"),  # Radio or Dropdown for permit type
-    State("global_filter", "data")
+    State("global_filter", "data"),
+    prevent_initial_call=True
 )
 def update_permit_type(permit_type, global_filter):
     global_filter["permitType"] = permit_type
@@ -79,10 +90,11 @@ def update_permit_type(permit_type, global_filter):
 # 3) PLAY / PAUSE -> UPDATE "play" FIELD IN GLOBAL_FILTER
 # ------------------------------------------------------------------------------
 @app.callback(
-    Output("global_filter", "data"),
+    Output("global_filter", "data", allow_duplicate=True),
     Input("play-button", "n_clicks"),
     Input("pause-button", "n_clicks"),
-    State("global_filter", "data")
+    State("global_filter", "data"),
+    prevent_initial_call=True
 )
 def toggle_play(play_clicks, pause_clicks, global_filter):
     ctx = dash.callback_context
@@ -102,9 +114,10 @@ def toggle_play(play_clicks, pause_clicks, global_filter):
 # 4) SPEED DROPDOWN -> UPDATE "speed" FIELD IN GLOBAL_FILTER
 # ------------------------------------------------------------------------------
 @app.callback(
-    Output("global_filter", "data"),
+    Output("global_filter", "data", allow_duplicate=True),
     Input("speed-dropdown", "value"),
-    State("global_filter", "data")
+    State("global_filter", "data"),
+    prevent_initial_call=True
 )
 def update_speed_dropdown(selected_speed, global_filter):
     global_filter["speed"] = selected_speed
@@ -131,9 +144,10 @@ def control_animation_interval(global_filter):
 # 6) ON TICK OF THE INTERVAL -> ADVANCE currentQuarterIndex IN GLOBAL_FILTER
 # ------------------------------------------------------------------------------
 @app.callback(
-    Output("global_filter", "data"),
+    Output("global_filter", "data", allow_duplicate=True),
     Input("animation-interval", "n_intervals"),
-    State("global_filter", "data")
+    State("global_filter", "data"),
+    prevent_initial_call=True
 )
 def advance_current_quarter(n_intervals, global_filter):
     # Read the current quarter index and the start/end
@@ -159,21 +173,25 @@ def advance_current_quarter(n_intervals, global_filter):
     Input("global_filter", "data")
 )
 def update_quarterly_map(global_filter):
-    """
-    Displays data for the single quarter at global_filter['currentQuarterIndex'].
-    """
+    logger.info(f"Updating quarterly map with global_filter: {global_filter}")
+    
     current_idx = global_filter.get("currentQuarterIndex", 0)
     permit_type = global_filter.get("permitType", "NB")
-
+    
+    logger.info(f"Current index: {current_idx}, Permit type: {permit_type}")
+    
     # Clamp the index
     if current_idx < 0 or current_idx >= len(quarters):
         current_idx = 0
-
+    
     # Convert index -> quarter label
     quarter_label = quarters[current_idx]
-
+    logger.info(f"Quarter label: {quarter_label}")
+    
     # Now call the data utility to build the figure
-    return create_map_for_single_quarter(quarter_label, permit_type)
+    fig = create_map_for_single_quarter(quarter_label, permit_type)
+    logger.info(f"Figure created with data: {bool(fig.data)}")
+    return fig
 
 
 # ------------------------------------------------------------------------------
@@ -200,7 +218,8 @@ def update_aggregated_map(global_filter):
     start_label = quarters[start_idx]
     end_label   = quarters[end_idx]
 
-    return create_map_for_aggregated(start_label, end_label, permit_type)
+    fig = create_map_for_aggregated(start_label, end_label, permit_type)
+    return fig
 
 
 # ------------------------------------------------------------------------------
@@ -226,19 +245,30 @@ def update_time_series(global_filter):
     # Create a numeric index to plot on x-axis
     agg_ts["quarter_idx"] = agg_ts["period"].map(quarter_to_index)
 
+    # Get proper permit labels
+    permit_label = None
+    for opt in permit_options:
+        if opt["value"] == permit_type:
+            permit_label = opt["label"]
+            break
+
+    if permit_label is None:
+        permit_label = permit_type  # fallback
+
     fig = px.line(
         agg_ts,
         x="quarter_idx",
         y=permit_type,
-        title=f"Time-Series of {permit_type}",
+        title=f"Time-Series of {permit_label}" + " Permits Issued",
         template="plotly_white",
         markers=True
     )
 
-    # Add a shape for the selected range
     fig.update_layout(
+        xaxis_title="Time Period",  # rename the x-axis
+        yaxis_title=permit_label,   # rename the y-axis
         shapes=[
-            # Shaded region for start_idx -> end_idx
+            # your existing shapes
             dict(
                 type="rect",
                 xref="x",
@@ -252,7 +282,6 @@ def update_time_series(global_filter):
                 layer="below",
                 line_width=0
             ),
-            # Vertical line for currentQuarterIndex
             dict(
                 type="line",
                 xref="x",
@@ -264,7 +293,17 @@ def update_time_series(global_filter):
                 line=dict(color="red", width=2, dash="dot")
             )
         ],
-        xaxis=dict(range=[-0.5, len(quarters) - 0.5])  # keep the entire domain visible
+        xaxis=dict(range=[-0.5, len(quarters) - 0.5])
+    )
+
+    # Show every 4th tick, rotated 45 degrees
+    tick_indices = list(range(0, len(quarters), 4))
+    fig.update_xaxes(
+        tickmode='array',
+        tickvals=tick_indices,  # Every 4th numeric x-value
+        ticktext=[quarters[i] for i in tick_indices],  # Corresponding quarter labels
+        tickangle=45  # Rotate labels 45 degrees
     )
 
     return fig
+

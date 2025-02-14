@@ -4,6 +4,7 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html
 from src.config import ANIMATION_INTERVAL
 from src.data_utils import quarters, permit_options
+from src.debug import debug_div
 
 layout = dbc.Container(
     fluid=True,
@@ -45,6 +46,7 @@ layout = dbc.Container(
                     html.Div([
                         html.Button("▶️ Play", id='play-button', n_clicks=0,
                                     className="btn btn-primary mb-2"),
+                        html.Button("⏸ Pause", id='pause-button', n_clicks=0, className="btn btn-secondary mb-2"),
                         html.Button("Clear Time Range", id='clear-time-range', n_clicks=0,
                                     className="btn btn-secondary mb-2"),
                         html.Button("Clear Hexes", id='clear-hexes', n_clicks=0,
@@ -110,20 +112,21 @@ layout = dbc.Container(
         dcc.Store(
             id='global_filter',
             data={
-                "startQuarter": None,
-                "endQuarter": None,
-                "currentQuarter": None,
-                "permitType": "All",
+                "startQuarterIndex": 0,
+                "endQuarterIndex": len(quarters) - 1,
+                "currentQuarterIndex": 0,
+                "permitType": "NB",
                 "play": False,
                 "speed": 1000
             }
         ),
         dcc.Interval(
-            id='play-interval',
+            id='animation-interval',
             interval=ANIMATION_INTERVAL,
             n_intervals=0,
             disabled=True
-        )
+        ),
+        debug_div
     ],
     className="p-4"
 )

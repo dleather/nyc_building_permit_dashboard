@@ -5,15 +5,39 @@ import numpy as np
 from pathlib import Path
 from src.config import PROCESSED_DATA_PATH
 import plotly.express as px
+import logging
+import os
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logger.info("=== Starting data_utils.py ===")
+logger.info(f"Current working directory: {os.getcwd()}")
+logger.info(f"PROCESSED_DATA_PATH: {PROCESSED_DATA_PATH}")
+logger.info(f"Does data path exist? {os.path.exists(PROCESSED_DATA_PATH)}")
+
+# Check for specific files
+hex_file = f"{PROCESSED_DATA_PATH}/nyc_hexes.geojson"
+permits_file = f"{PROCESSED_DATA_PATH}/permits_wide.csv"
+
+logger.info(f"Does {hex_file} exist? {os.path.exists(hex_file)}")
+logger.info(f"Does {permits_file} exist? {os.path.exists(permits_file)}")
 
 # Load hex data and do necessary type conversions:
 hex_gdf = gpd.read_file(f"{PROCESSED_DATA_PATH}/nyc_hexes.geojson")
 hex_gdf['h3_index'] = hex_gdf['h3_index'].astype(str)
 hex_geojson = json.loads(hex_gdf.to_json())
 
+logger.info(f"Loaded hex_gdf with shape: {hex_gdf.shape}")
+logger.info(f"Sample h3_index values: {hex_gdf['h3_index'].head().tolist()}")
+
 # Load permits data:
 permit_counts_path = Path(f"{PROCESSED_DATA_PATH}/permits_wide.csv")
 permit_counts_wide = pd.read_csv(permit_counts_path)
+
+logger.info(f"Loaded permit_counts_wide with shape: {permit_counts_wide.shape}")
+logger.info(f"Available columns: {permit_counts_wide.columns.tolist()}")
+logger.info(f"Sample periods: {permit_counts_wide['period'].unique()[:5].tolist()}")
 
 # Compute quarters & mapping:
 quarters = sorted(permit_counts_wide['period'].unique())
@@ -23,9 +47,9 @@ quarter_to_index = {q: i for i, q in enumerate(quarters)}
 permit_options = [
     {"label": "New Building", "value": "NB"},
     {"label": "Demolition", "value": "DM"},
-    {"label": "Type I - Major Alteration", "value": "A1"},
-    {"label": "Type II - Minor Alteration", "value": "A2"},
-    {"label": "Type III - Minor Alteration", "value": "A3"},
+    {"label": "Type I - Major Alteration (A1)", "value": "A1"},
+    {"label": "Type II - Minor Alteration (A2)", "value": "A2"},
+    {"label": "Type III - Minor Alteration (A3)", "value": "A3"},
     {"label": "All Permits", "value": "total_permit_count"}
 ]
 permit_type_list = [opt["value"] for opt in permit_options]
@@ -58,22 +82,22 @@ def create_map_for_single_quarter(quarter: str, permit_type: str):
     if data_sub.empty:
         # Handle the edge case of no data
         # (maybe return an empty figure or a figure with a note)
-        fig = px.choropleth_mapbox()
+        fig = px.choropleth_map()
         fig.update_layout(title_text="No data for selected quarter.")
         return fig
 
     # Get the color scale range for this permit type
     cmin, cmax = global_color_scales[permit_type]
 
-    fig = px.choropleth_mapbox(
+    fig = px.choropleth_map(
         data_sub,
         geojson=hex_geojson,
         locations="h3_index",
         featureidkey="properties.h3_index",
         color=permit_type,
-        color_continuous_scale="Viridis",
+        color_continuous_scale="Reds",
         range_color=(cmin, cmax),
-        mapbox_style="carto-positron",
+        map_style="basic",
         zoom=9,
         center={"lat": 40.7, "lon": -73.9},  # Adjust center for NYC
         opacity=0.6,
@@ -101,7 +125,7 @@ def create_map_for_aggregated(start_quarter: str, end_quarter: str, permit_type:
     data_range = permit_counts_wide.loc[mask, ["h3_index", permit_type]]
     
     if data_range.empty:
-        fig = px.choropleth_mapbox()
+        fig = px.choropleth_map()
         fig.update_layout(title_text="No data for selected time range.")
         return fig
     
@@ -111,15 +135,15 @@ def create_map_for_aggregated(start_quarter: str, end_quarter: str, permit_type:
     # Get the color scale range for this permit type
     cmin, cmax = global_color_scales[permit_type]
 
-    fig = px.choropleth_mapbox(
+    fig = px.choropleth_map(
         grouped,
         geojson=hex_geojson,
         locations="h3_index",
         featureidkey="properties.h3_index",
         color=permit_type,
-        color_continuous_scale="Viridis",
+        color_continuous_scale="Reds",
         range_color=(cmin, cmax),
-        mapbox_style="carto-positron",
+        map_style="basic",
         zoom=9,
         center={"lat": 40.7, "lon": -73.9},
         opacity=0.6,
