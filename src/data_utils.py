@@ -7,6 +7,8 @@ from src.config import PROCESSED_DATA_PATH
 import plotly.express as px
 import logging
 import os
+import numpy as np
+import plotly.express as px
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -65,100 +67,196 @@ for pt in permit_type_list:
         global_min = val_series.min()
         global_max = np.percentile(val_series, 99)
     global_color_scales[pt] = (global_min, global_max)
-    
-def create_map_for_single_quarter(quarter: str, permit_type: str):
+
+def create_map_for_single_quarter(quarter_label: str, 
+                                  start_quarter: str, 
+                                  end_quarter: str, 
+                                  permit_type: str):
     """
-    Build a choropleth map for a single quarter using a specified permit type.
-    
-    :param quarter: The quarter string (e.g., "2019Q1") to filter on.
-    :param permit_type: The column name to use for coloring (e.g., "NB", "DM", "total_permit_count").
-    :return: A Plotly figure object (choropleth map).
+    Show the distribution for one particular quarter (quarter_label),
+    but color scale is normalized to the *subrange* [start_quarter..end_quarter].
     """
-    
-    # Filter rows for the given quarter
-    mask = (permit_counts_wide["period"] == quarter)
-    data_sub = permit_counts_wide.loc[mask, ["h3_index", permit_type]]
-    
-    if data_sub.empty:
-        # Handle the edge case of no data
-        # (maybe return an empty figure or a figure with a note)
-        fig = px.choropleth_map()
+    # (1) The data for just this one quarter
+    sub_quarter = permit_counts_wide.loc[
+        permit_counts_wide["period"] == quarter_label,
+        ["h3_index", "period", permit_type]
+    ]
+    if sub_quarter.empty:
+        fig = px.choropleth_mapbox()
         fig.update_layout(title_text="No data for selected quarter.")
         return fig
-
-    # Get the color scale range for this permit type
-    cmin, cmax = global_color_scales[permit_type]
-
-    fig = px.choropleth_map(
-        data_sub,
+    
+    # (2) Find the max single-quarter value *across the entire subrange*
+    # so that all quarters in that subrange share the same scale
+    subrange_max = get_subrange_singlequarter_max(permit_type, start_quarter, end_quarter)
+    # e.g. subrange_max = sub_quarter[permit_type].max() 
+    # if you only want to scale to *this* quarter’s max. But we want subrange scale.
+    
+    # (3) Decide on log vs. linear
+    USE_LOG = (subrange_max > 20)
+    
+    if USE_LOG:
+        sub_quarter["log_count"] = np.log10(sub_quarter[permit_type] + 1.0)
+        cmin = 0
+        cmax = np.log10(subrange_max + 1.0)
+        color_col = "log_count"
+    else:
+        cmin = 0
+        cmax = subrange_max
+        color_col = permit_type
+    
+    # (4) Build the figure
+    fig = px.choropleth_mapbox(
+        sub_quarter,
         geojson=hex_geojson,
         locations="h3_index",
         featureidkey="properties.h3_index",
-        color=permit_type,
+        color=color_col,
         color_continuous_scale="Reds",
         range_color=(cmin, cmax),
-        map_style="basic",
         zoom=9,
-        center={"lat": 40.7, "lon": -73.9},  # Adjust center for NYC
+        center={"lat": 40.7, "lon": -73.9},
         opacity=0.6,
-        labels={permit_type: permit_type}
+        mapbox_style="carto-positron"
     )
-    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+    
+    if USE_LOG:
+        # Possibly define custom ticks in log space
+        possible_ticks = np.arange(0, 7)
+        tick_vals = [v for v in possible_ticks if v <= cmax]
+        tick_text = [f"{10**v:.0f}" for v in tick_vals]
+        
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                tickmode="array",
+                tickvals=tick_vals,
+                ticktext=tick_text,
+                title=f"{permit_type}",
+            )
+        )
+    else:
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                title=f"{permit_type}"
+            )
+        )
+    
     return fig
+
+
 
 def create_map_for_aggregated(start_quarter: str, end_quarter: str, permit_type: str):
     """
-    Build a choropleth map aggregating the specified permit type 
-    from start_quarter through end_quarter (inclusive).
-    
-    :param start_quarter: The starting quarter (e.g., "2019Q1").
-    :param end_quarter: The ending quarter (e.g., "2021Q2").
-    :param permit_type: The permit type column to sum (e.g., "NB", "total_permit_count").
-    :return: A Plotly figure with the aggregated data.
+    Build a choropleth that sums the chosen permit type from start_quarter..end_quarter.
+    The color scale is normalized *only* for that subrange, so it re-scales each time
+    the user changes start/end. We optionally apply a log scale if the subrange max is big.
     """
     
-    # 1) Filter rows to the chosen time range
-    mask = (
-        (permit_counts_wide["period"] >= start_quarter)
-        & (permit_counts_wide["period"] <= end_quarter)
-    )
-    data_range = permit_counts_wide.loc[mask, ["h3_index", permit_type]]
-    
-    # 2) If no data for this range -> return an empty figure
-    if data_range.empty:
-        fig = px.choropleth_map()
+    sub = permit_counts_wide.loc[
+        (permit_counts_wide["period"] >= start_quarter) &
+        (permit_counts_wide["period"] <= end_quarter),
+        ["h3_index", "period", permit_type]
+    ]
+    if sub.empty:
+        fig = px.choropleth_mapbox()
         fig.update_layout(title_text="No data for selected time range.")
         return fig
     
-    # 3) Group by h3_index, summing the chosen permit column
-    grouped = data_range.groupby("h3_index", as_index=False)[permit_type].sum()
-    
-    # 4) Dynamically compute the color scale min/max from the data
-    cmin = grouped[permit_type].min()
-    cmax = grouped[permit_type].max()
-    
-    # If cmin == cmax, give a small range so we don’t get a zero-width color scale
-    if cmin == cmax:
-        cmax = cmin + 1
+    # (1) Sum across the subrange
+    grouped = sub.groupby("h3_index", as_index=False)[permit_type].sum()
 
-    # 5) Build the choropleth (adjust to your actual function name if needed)
-    fig = px.choropleth_map(
+    # (2) Find the subrange-wide aggregated max
+    agg_max = grouped[permit_type].max()
+    
+    # (3) Decide on log vs. linear
+    USE_LOG = (agg_max > 20)  # or pick your own threshold
+    if USE_LOG:
+        grouped["log_count"] = np.log10(grouped[permit_type] + 1.0)
+        cmin = 0
+        cmax = np.log10(agg_max + 1.0)
+        color_col = "log_count"
+    else:
+        cmin = 0
+        cmax = agg_max
+        color_col = permit_type
+    
+    # (4) Build the figure
+    fig = px.choropleth_mapbox(
         grouped,
         geojson=hex_geojson,
         locations="h3_index",
         featureidkey="properties.h3_index",
-        color=permit_type,
+        color=color_col,
         color_continuous_scale="Reds",
-        range_color=(cmin, cmax),  # Renormalize each time based on this subset
-        map_style="basic",
+        range_color=(cmin, cmax),
         zoom=9,
         center={"lat": 40.7, "lon": -73.9},
         opacity=0.6,
-        labels={permit_type: permit_type}
+        mapbox_style="carto-positron",
     )
+    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
     
-    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    # (5) Customize the colorbar
+    if USE_LOG:
+        # Example: custom log ticks at powers of 10
+        # E.g. 0 => 10^0=1, 1 => 10^1=10, etc.
+        # Filter to only show ticks up to cmax
+        possible_ticks = np.arange(0, 7)  # 0..6
+        tick_vals = [v for v in possible_ticks if v <= cmax]
+        tick_text = [f"{10**v:.0f}" for v in tick_vals]
+        
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                tickmode="array",
+                tickvals=tick_vals,
+                ticktext=tick_text,
+                title=f"{permit_type}",
+            )
+        )
+    else:
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                title=f"{permit_type}"
+            )
+        )
+    
     return fig
+
+def get_subrange_singlequarter_max(permit_type: str, start_label: str, end_label: str) -> float:
+    """
+    Return the maximum single-quarter count of `permit_type` over all
+    quarters in [start_label, end_label].
+    
+    For each row in that date range (each (quarter, h3_index)), 
+    we just look at the raw value (not summed across quarters).
+    """
+    sub = permit_counts_wide[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label)
+    ]
+    if sub.empty:
+        return 0  # or np.nan
+    
+    return sub[permit_type].max(skipna=True)
+
+
+def get_subrange_aggregated_max(permit_type: str, start_label: str, end_label: str) -> float:
+    """
+    Return the maximum aggregated sum of `permit_type` across the subrange [start_label, end_label].
+    
+    - We sum the permit counts from start_label..end_label for each hex.
+    - Then find the max over all hexes.
+    """
+    sub = permit_counts_wide[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label)
+    ]
+    if sub.empty:
+        return 0  # or np.nan
+
+    grouped = sub.groupby("h3_index")[permit_type].sum()
+    return grouped.max(skipna=True)
 
 
 # Expose these variables for use in callbacks and layout:

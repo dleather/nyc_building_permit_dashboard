@@ -169,24 +169,22 @@ def advance_current_quarter(n_intervals, global_filter):
     Input("global_filter", "data")
 )
 def update_quarterly_map(global_filter):
-    logger.info(f"Updating quarterly map with global_filter: {global_filter}")
-    
     current_idx = global_filter.get("currentQuarterIndex", 0)
     permit_type = global_filter.get("permitType", "NB")
+    start_idx   = global_filter.get("startQuarterIndex", 0)
+    end_idx     = global_filter.get("endQuarterIndex", len(quarters)-1)
     
-    logger.info(f"Current index: {current_idx}, Permit type: {permit_type}")
-    
-    # Clamp the index
-    if current_idx < 0 or current_idx >= len(quarters):
-        current_idx = 0
-    
-    # Convert index -> quarter label
+    # Convert indices to strings
     quarter_label = quarters[current_idx]
-    logger.info(f"Quarter label: {quarter_label}")
+    start_label   = quarters[start_idx]
+    end_label     = quarters[end_idx]
     
-    # Now call the data utility to build the figure
-    fig = create_map_for_single_quarter(quarter_label, permit_type)
-    logger.info(f"Figure created with data: {bool(fig.data)}")
+    fig = create_map_for_single_quarter(
+        quarter_label=quarter_label,
+        start_quarter=start_label,
+        end_quarter=end_label,
+        permit_type=permit_type
+    )
     return fig
 
 
@@ -198,23 +196,18 @@ def update_quarterly_map(global_filter):
     Input("global_filter", "data")
 )
 def update_aggregated_map(global_filter):
-    """
-    Displays aggregated data from startQuarterIndex to endQuarterIndex.
-    """
-    start_idx = global_filter.get("startQuarterIndex", 0)
-    end_idx   = global_filter.get("endQuarterIndex", len(quarters) - 1)
     permit_type = global_filter.get("permitType", "NB")
-
-    # Clamp
-    if start_idx < 0: start_idx = 0
-    if end_idx >= len(quarters):
-        end_idx = len(quarters) - 1
-
-    # Convert indices -> quarter labels
+    start_idx   = global_filter.get("startQuarterIndex", 0)
+    end_idx     = global_filter.get("endQuarterIndex", len(quarters)-1)
+    
     start_label = quarters[start_idx]
     end_label   = quarters[end_idx]
-
-    fig = create_map_for_aggregated(start_label, end_label, permit_type)
+    
+    fig = create_map_for_aggregated(
+        start_quarter=start_label,
+        end_quarter=end_label,
+        permit_type=permit_type
+    )
     return fig
 
 
