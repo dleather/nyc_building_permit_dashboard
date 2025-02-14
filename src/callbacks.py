@@ -325,9 +325,8 @@ def update_aggregated_map(global_filter):
 )
 def update_time_series(global_filter):
     permit_type = global_filter.get("permitType", "NB")
-    # remove the title from the px.line creation or update_layout call
-    start_idx   = global_filter.get("startQuarterIndex", 0)
-    end_idx     = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    start_idx = global_filter.get("startQuarterIndex", 0)
+    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
     current_idx = global_filter.get("currentQuarterIndex", 0)
     selected_hexes = global_filter.get("selectedHexes", [])
 
@@ -343,27 +342,23 @@ def update_time_series(global_filter):
         agg_ts,
         x="quarter_idx",
         y=permit_type,
-        # Remove the title here – we'll set it separately.
         template="plotly_white",
         markers=True
     )
+
+    # Update line and marker colors to match Reds colormap
+    fig.update_traces(
+        line_color='rgb(178, 24, 43)',  # Less intense red from Reds colormap
+        marker_color='rgb(178, 24, 43)',
+        line_width=2,
+        marker_size=6
+    )
+
     fig.update_layout(
         xaxis_title="Time Period",
         yaxis_title=get_permit_label(permit_type),
-        shapes=[  # shaded areas and current time line
-            dict(
-                type="rect",
-                xref="x",
-                yref="paper",
-                x0=start_idx,
-                x1=end_idx,
-                y0=0,
-                y1=1,
-                fillcolor="lightblue",
-                opacity=0.3,
-                layer="below",
-                line_width=0
-            ),
+        # Add a light gray vertical line for current time
+        shapes=[
             dict(
                 type="line",
                 xref="x",
@@ -372,17 +367,50 @@ def update_time_series(global_filter):
                 x1=current_idx,
                 y0=0,
                 y1=1,
-                line=dict(color="red", width=2, dash="dot")
+                line=dict(color="gray", width=3, dash="dash")
             )
         ],
-        xaxis=dict(range=[-0.5, len(quarters) - 0.5])
+        # Minimize whitespace
+        margin=dict(l=50, r=20, t=10, b=50),
+        xaxis=dict(
+            range=[-0.5, len(quarters) - 0.5],
+            showgrid=True,
+            gridcolor='rgba(211, 211, 211, 0.3)',  # Light gray grid
+            fixedrange=True  # Disable zoom on x-axis
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor='rgba(211, 211, 211, 0.3)',  # Light gray grid
+            zeroline=False,
+            fixedrange=True  # Disable zoom on y-axis
+        ),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        # Disable all modebar buttons
+        showlegend=False,
+        dragmode=False,
     )
+
+    # Update configuration to disable all interactive features
     fig.update_xaxes(
         tickmode='array',
         tickvals=list(range(0, len(quarters), 4)),
         ticktext=[quarters[i] for i in range(0, len(quarters), 4)],
         tickangle=45
     )
+
+    # Add static configuration
+    fig.update_layout(
+        modebar=dict(
+            remove=[
+                'zoom', 'pan', 'select', 'lasso2d', 'zoomIn2d', 
+                'zoomOut2d', 'autoScale2d', 'resetScale2d',
+                'hoverClosestCartesian', 'hoverCompareCartesian',
+                'toggleSpikelines'
+            ]
+        )
+    )
+
     return fig
 
 
