@@ -4,10 +4,6 @@ from dash.dependencies import Input, Output, State
 import dash
 from dash import no_update, html
 from src.app_instance import app
-from src.data_utils import permit_options, build_quarterly_figure_faded_px
-from src.data_utils import build_quarterly_figure_two_traces, get_permit_label
-from src.data_utils import ensure_all_hexes, global_agg_99, ensure_all_hexes
-from src.data_utils import global_quarterly_99, build_two_trace_mapbox
 import logging
 
 # Plotly for the time-series figure:
@@ -18,12 +14,15 @@ import plotly.graph_objs as go
 from src.data_utils import (
     quarters,
     quarter_to_index,
-    create_map_for_single_quarter,
-    create_map_for_aggregated,
     hex_geojson,
     permit_counts_wide,
-    get_subrange_singlequarter_max,
-    get_subrange_aggregated_max
+    permit_options,
+    get_permit_label,
+    ensure_all_hexes,
+    global_agg_99,
+    global_quarterly_99,
+    build_two_trace_mapbox,
+    get_subrange_singlequarter_99
 )
 
 import numpy as np
@@ -176,30 +175,46 @@ from src.data_utils import ensure_all_hexes, global_quarterly_99, all_hexes
     Input("global_filter", "data")
 )
 def update_quarterly_map(global_filter):
-    permit_type = global_filter.get("permitType", "NB")
-    current_idx = global_filter.get("currentQuarterIndex", 0)
-    selected_hex = global_filter.get("selectedHexes", [])
+    permit_type  = global_filter.get("permitType", "NB")
+    current_idx  = global_filter.get("currentQuarterIndex", 0)
+    start_idx    = global_filter["startQuarterIndex"]
+    end_idx      = global_filter["endQuarterIndex"]
+    selected_hex = global_filter["selectedHexes"] or []  # might be empty
+    permit_type  = global_filter.get("permitType", "NB")
 
+    # Convert indices to actual quarter labels
+    start_label = quarters[start_idx]
     quarter_label = quarters[current_idx]
+    end_label   = quarters[end_idx]
 
-    # ------------------------------------------------------------------
-    # 1) Build the "base" DF for the current quarter
-    # ------------------------------------------------------------------
+    # 1) Filter to the chosen subrange AND chosen hexes
+    #    (this covers *all* quarters in the subrange, not just the current quarter)
+    df_sub_seln = permit_counts_wide.loc[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label) &
+        (permit_counts_wide["h3_index"].isin(selected_hex))
+    ]
+
+    # 1) Filter the data to *this quarter* only
     df_current = permit_counts_wide.loc[
         permit_counts_wide["period"] == quarter_label
     ].copy()
+    
+    
     if df_current.empty:
         return px.choropleth_mapbox()
 
+    # Ensure all hexes are present:
     df_current = ensure_all_hexes(df_current, permit_type)
 
-    # Base layer color scale
-    cmin_base = 0
-    cmax_base = global_quarterly_99[permit_type]  # or your old logic
+    # 2) Compute subrange 99th percentile for single-quarter data
+    subrange_99 = get_subrange_singlequarter_99(permit_type, start_label, end_label)
 
-    # ------------------------------------------------------------------
-    # 2) If no selection => treat as "select everything"
-    # ------------------------------------------------------------------
+    # 3) Decide cmin/cmax for base and top traces
+    cmin_base = 0
+    cmax_base = subrange_99
+
+    # If no selection => treat as "select everything"
     if not selected_hex:
         selected_hex = df_current["h3_index"].tolist()
 
@@ -207,12 +222,15 @@ def update_quarterly_map(global_filter):
     if df_top.empty:
         df_top = df_current.copy()
 
+    # Use the *same* subrange_99 for cmax_top
     cmin_top = 0
-    cmax_top = df_top[permit_type].max()
+    if df_sub_seln.empty:
+    # If user hasn't selected any hexes or if subrange is empty, fallback
+        cmax_top = subrange_99
+    else:
+        cmax_top = df_sub_seln[permit_type].max()
 
-    # ------------------------------------------------------------------
-    # 3) Build 2‐trace figure
-    # ------------------------------------------------------------------
+    # 4) Build the 2-trace figure
     fig = build_two_trace_mapbox(
         df_base=df_current,
         df_top=df_top,

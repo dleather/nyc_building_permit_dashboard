@@ -48,10 +48,10 @@ layout = dbc.Container(
                             id='speed-dropdown',
                             options=[
                                 {'label': 'Slow', 'value': 1000},
-                                {'label': 'Medium', 'value': 500},
-                                {'label': 'Fast', 'value': 250}
+                                {'label': 'Medium', 'value': 750},
+                                {'label': 'Fast', 'value': 500}
                             ],
-                            value=500,
+                            value=750,
                             clearable=False,
                             style={'width': '100%'}
                         ),
