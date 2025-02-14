@@ -4,6 +4,7 @@ import json
 import numpy as np
 from pathlib import Path
 from src.config import PROCESSED_DATA_PATH
+import plotly.express as px
 
 # Load hex data and do necessary type conversions:
 hex_gdf = gpd.read_file(f"{PROCESSED_DATA_PATH}/nyc_hexes.geojson")
@@ -40,6 +41,92 @@ for pt in permit_type_list:
         global_min = val_series.min()
         global_max = np.percentile(val_series, 99)
     global_color_scales[pt] = (global_min, global_max)
+    
+def create_map_for_single_quarter(quarter: str, permit_type: str):
+    """
+    Build a choropleth map for a single quarter using a specified permit type.
+    
+    :param quarter: The quarter string (e.g., "2019Q1") to filter on.
+    :param permit_type: The column name to use for coloring (e.g., "NB", "DM", "total_permit_count").
+    :return: A Plotly figure object (choropleth map).
+    """
+    
+    # Filter rows for the given quarter
+    mask = (permit_counts_wide["period"] == quarter)
+    data_sub = permit_counts_wide.loc[mask, ["h3_index", permit_type]]
+    
+    if data_sub.empty:
+        # Handle the edge case of no data
+        # (maybe return an empty figure or a figure with a note)
+        fig = px.choropleth_mapbox()
+        fig.update_layout(title_text="No data for selected quarter.")
+        return fig
+
+    # Get the color scale range for this permit type
+    cmin, cmax = global_color_scales[permit_type]
+
+    fig = px.choropleth_mapbox(
+        data_sub,
+        geojson=hex_geojson,
+        locations="h3_index",
+        featureidkey="properties.h3_index",
+        color=permit_type,
+        color_continuous_scale="Viridis",
+        range_color=(cmin, cmax),
+        mapbox_style="carto-positron",
+        zoom=9,
+        center={"lat": 40.7, "lon": -73.9},  # Adjust center for NYC
+        opacity=0.6,
+        labels={permit_type: permit_type}
+    )
+    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    return fig
+
+def create_map_for_aggregated(start_quarter: str, end_quarter: str, permit_type: str):
+    """
+    Build a choropleth map aggregating the specified permit type 
+    from start_quarter through end_quarter (inclusive).
+    
+    :param start_quarter: The starting quarter (e.g., "2019Q1").
+    :param end_quarter: The ending quarter (e.g., "2021Q2").
+    :param permit_type: The permit type column to sum (e.g., "NB", "total_permit_count").
+    :return: A Plotly figure with the aggregated data.
+    """
+    
+    # Filter to rows where period is between start_quarter and end_quarter
+    # This assumes quarter strings sort lexicographically in the correct order 
+    # (like "2019Q1" < "2019Q2" < ...). If not, you might need a more robust comparison.
+    mask = (permit_counts_wide["period"] >= start_quarter) & \
+           (permit_counts_wide["period"] <= end_quarter)
+    data_range = permit_counts_wide.loc[mask, ["h3_index", permit_type]]
+    
+    if data_range.empty:
+        fig = px.choropleth_mapbox()
+        fig.update_layout(title_text="No data for selected time range.")
+        return fig
+    
+    # Group by h3_index and sum the chosen permit column
+    grouped = data_range.groupby("h3_index", as_index=False)[permit_type].sum()
+    
+    # Get the color scale range for this permit type
+    cmin, cmax = global_color_scales[permit_type]
+
+    fig = px.choropleth_mapbox(
+        grouped,
+        geojson=hex_geojson,
+        locations="h3_index",
+        featureidkey="properties.h3_index",
+        color=permit_type,
+        color_continuous_scale="Viridis",
+        range_color=(cmin, cmax),
+        mapbox_style="carto-positron",
+        zoom=9,
+        center={"lat": 40.7, "lon": -73.9},
+        opacity=0.6,
+        labels={permit_type: permit_type}
+    )
+    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    return fig
 
 # Expose these variables for use in callbacks and layout:
 __all__ = [

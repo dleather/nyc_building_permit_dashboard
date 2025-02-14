@@ -1,20 +1,25 @@
-import dash
+from dash import Dash
 import dash_bootstrap_components as dbc
-import uvicorn
+from asgiref.wsgi import WsgiToAsgi
 
-from src.config import *
-from src.layout import layout
-from src import callbacks  # This registers all the callbacks
-
-app = dash.Dash(
+# Initialize the Dash app
+app = Dash(
     __name__,
     external_stylesheets=[dbc.themes.LUX],
+    suppress_callback_exceptions=True
 )
+server = app.server  # Expose server for production deployment
+
+# Import and set the layout
+from src.layout import layout
 app.layout = layout
 
-# Expose the underlying Flask server for Uvicorn
-server = app.server
+# Import callbacks (this registers them)
+from src import callbacks
+
+# Create ASGI app from WSGI app
+asgi_app = WsgiToAsgi(server)
 
 if __name__ == "__main__":
-    # Run Uvicorn on port 8000
-    uvicorn.run("src.app:server", host="127.0.0.1", port=8000, reload=True) 
+    import uvicorn
+    uvicorn.run("src.app:asgi_app", host="127.0.0.1", port=8000, reload=True) 
