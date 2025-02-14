@@ -2,11 +2,11 @@
 ```
 .
 ├─.python-version
-├─README.md
 ├─assets
 │ ├─background.png
 │ └─style.css
 ├─codebase.md
+├─data
 ├─pyproject.toml
 ├─run_codeweaver.bat
 ├─src
@@ -14,6 +14,7 @@
 │ ├─app_instance.py
 │ ├─callbacks.py
 │ ├─config.py
+│ ├─data_utils.py
 │ ├─debug.py
 │ └─layout.py
 └─uv.lock
@@ -24,172 +25,6 @@
 ## .python-version
 ```python-version
 3.13
-
-```
-
-## README.md
-```md
-# NYC Building Permit Dashboard
-
-An interactive data science dashboard for visualizing and analyzing NYC building permit data. This project leverages modern web development and data science techniques to provide dynamic insights into permit issuance over time and across the city's geospatial landscape.
-
-[![Python Version](https://img.shields.io/badge/python->=3.13-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
----
-
-## Overview
-
-The **NYC Building Permit Dashboard** is built using [Dash](https://dash.plotly.com/) and [Plotly](https://plotly.com/python/) to create a responsive, highly interactive web application. It processes geospatial data with [GeoPandas](https://geopandas.org/) and performs advanced data manipulation with [pandas](https://pandas.pydata.org/). By combining these powerful tools, the dashboard enables users to:
-
-- Explore building permit trends over time via intuitive time-series visualizations.
-- Interactively filter and analyze permits by type using real-time Dash callbacks.
-- View spatial distributions of permits on NYC maps with aggregated and quarterly views.
-- Leverage best engineering practices with a modular codebase and clean separation of concerns.
-
-This application not only demonstrates proficiency in data science but also showcases robust web development skills.
-
----
-
-## Features
-
-- **Interactive Time-Series Analysis:** Visualize permit issuance trends with dynamic annotations for selected time ranges.
-- **Choropleth Mapping:** Explore detailed and aggregated maps of NYC building permits using a hexagonal spatial grid.
-- **Dynamic Filtering:** Easily switch between permit types and time periods with radio buttons, sliders, and dropdown menus.
-- **Modular Design:** Clean separation between layout, callbacks, configuration, and data processing for maintainability and scalability.
-- **Logging & Debugging:** Built-in logging and a hidden debug panel to facilitate troubleshooting during development.
-
----
-
-## Installation
-
-### Prerequisites
-
-- Python >= 3.13
-- [pip](https://pip.pypa.io/)
-- (Optional) A virtual environment tool such as [venv](https://docs.python.org/3/library/venv.html) or [conda](https://docs.conda.io/).
-
-### Setup Instructions
-
-1. **Clone the Repository:**
-
-   ```bash
-   git clone https://github.com/yourusername/nyc-building-permit-dashboard.git
-   cd nyc-building-permit-dashboard
-   ```
-
-2. **Create a Virtual Environment (Recommended):**
-
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows use: venv\Scripts\activate
-   ```
-
-3. **Install Dependencies:**
-
-   The dependencies are managed via a `pyproject.toml` file. Install them using [pip]:
-
-   ```bash
-   pip install -e .
-   ```
-
-   Alternatively, if you use a requirements file generated from your project configuration, run:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Verify Data Files:**
-
-   Ensure the processed data is located in the `data/processed` directory. This data includes:
-   - `nyc_hexes.geojson` – the geospatial grid for NYC
-   - `permits_wide.csv` – the permit counts data
-
----
-
-## Usage
-
-To launch the dashboard locally, run:
-```bash
-python src/app.py
-```
-
-The app will start on [http://127.0.0.1:8050](http://127.0.0.1:8050). Open this link in your browser to interact with the dashboard.
-
----
-
-## Project Structure
-
-```
-.
-├── assets
-│   ├── background.png         # Image assets
-│   └── style.css              # Custom CSS styles
-├── codebase.md                # Project tree view and documentation
-├── data
-│   └── processed              # Preprocessed geospatial and permit data
-│       ├── nyc_hexes.geojson
-│       └── permits_wide.csv
-├── pyproject.toml             # Project configuration and dependency management
-├── run_codeweaver.bat         # Batch script for documentation generation (Windows)
-├── src
-│   ├── app.py                 # Application entry point
-│   ├── app_instance.py        # Dash app and server instance setup
-│   ├── callbacks.py           # All interactive component callbacks
-│   ├── config.py              # Configuration settings
-│   ├── data_utils.py          # Data processing and visualization utility functions
-│   ├── debug.py               # Debugging tools
-│   └── layout.py              # Dashboard layout definitions
-└── uv.lock                    # Dependency lock file
-```
-
----
-
-## Technology Stack
-
-- **Python** – Core programming language.
-- **Dash & Plotly** – For creating interactive web-based visualizations.
-- **GeoPandas & Pandas** – For data manipulation and geospatial analysis.
-- **Dash Bootstrap Components** – For responsive and attractive UI components.
-- **Uvicorn & ASGI** – (Optional) For deploying the app in an asynchronous production setting.
-
----
-
-## Data Science & Development Highlights
-
-- **Advanced Data Manipulation:** Efficient aggregation and transformation of permit data, including time-series grouping and dynamic geospatial mapping.
-- **Interactive Visualization:** Real-time updates across multiple charts and maps with advanced Dash callbacks.
-- **Modular and Scalable Codebase:** Leveraging best practices in software engineering by separating concerns into distinct modules (data utilities, layout, callbacks, configuration).
-- **Logging & Debugging:** Comprehensive logging throughout the data processing pipeline, facilitating easier identification and resolution of issues.
-- **Deployment Ready:** Configured for local debugging with potential for asynchronous deployment using ASGI and Uvicorn.
-
----
-
-## Contributing
-
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/yourusername/nyc-building-permit-dashboard/issues).
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Commit your changes (`git commit -m 'Add some feature'`).
-4. Push to your branch (`git push origin feature/your-feature`).
-5. Open a Pull Request.
-
----
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-## Author
-
-Created by [David Leather](https://daveleather.com). Explore more of my work and connect with me on [GitHub](https://github.com/dleather).
-
----
-
-Happy coding!
 
 ```
 
@@ -209,11 +44,11 @@ Happy coding!
 ```
 .
 ├─.python-version
-├─README.md
 ├─assets
 │ ├─background.png
 │ └─style.css
 ├─codebase.md
+├─data
 ├─pyproject.toml
 ├─run_codeweaver.bat
 ├─src
@@ -221,6 +56,7 @@ Happy coding!
 │ ├─app_instance.py
 │ ├─callbacks.py
 │ ├─config.py
+│ ├─data_utils.py
 │ ├─debug.py
 │ └─layout.py
 └─uv.lock
@@ -231,172 +67,6 @@ Happy coding!
 ## .python-version
 ```python-version
 3.13
-
-```
-
-## README.md
-```md
-# NYC Building Permit Dashboard
-
-An interactive data science dashboard for visualizing and analyzing NYC building permit data. This project leverages modern web development and data science techniques to provide dynamic insights into permit issuance over time and across the city's geospatial landscape.
-
-[![Python Version](https://img.shields.io/badge/python->=3.13-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
----
-
-## Overview
-
-The **NYC Building Permit Dashboard** is built using [Dash](https://dash.plotly.com/) and [Plotly](https://plotly.com/python/) to create a responsive, highly interactive web application. It processes geospatial data with [GeoPandas](https://geopandas.org/) and performs advanced data manipulation with [pandas](https://pandas.pydata.org/). By combining these powerful tools, the dashboard enables users to:
-
-- Explore building permit trends over time via intuitive time-series visualizations.
-- Interactively filter and analyze permits by type using real-time Dash callbacks.
-- View spatial distributions of permits on NYC maps with aggregated and quarterly views.
-- Leverage best engineering practices with a modular codebase and clean separation of concerns.
-
-This application not only demonstrates proficiency in data science but also showcases robust web development skills.
-
----
-
-## Features
-
-- **Interactive Time-Series Analysis:** Visualize permit issuance trends with dynamic annotations for selected time ranges.
-- **Choropleth Mapping:** Explore detailed and aggregated maps of NYC building permits using a hexagonal spatial grid.
-- **Dynamic Filtering:** Easily switch between permit types and time periods with radio buttons, sliders, and dropdown menus.
-- **Modular Design:** Clean separation between layout, callbacks, configuration, and data processing for maintainability and scalability.
-- **Logging & Debugging:** Built-in logging and a hidden debug panel to facilitate troubleshooting during development.
-
----
-
-## Installation
-
-### Prerequisites
-
-- Python >= 3.13
-- [pip](https://pip.pypa.io/)
-- (Optional) A virtual environment tool such as [venv](https://docs.python.org/3/library/venv.html) or [conda](https://docs.conda.io/).
-
-### Setup Instructions
-
-1. **Clone the Repository:**
-
-   ```bash
-   git clone https://github.com/yourusername/nyc-building-permit-dashboard.git
-   cd nyc-building-permit-dashboard
-   ```
-
-2. **Create a Virtual Environment (Recommended):**
-
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows use: venv\Scripts\activate
-   ```
-
-3. **Install Dependencies:**
-
-   The dependencies are managed via a `pyproject.toml` file. Install them using [pip]:
-
-   ```bash
-   pip install -e .
-   ```
-
-   Alternatively, if you use a requirements file generated from your project configuration, run:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Verify Data Files:**
-
-   Ensure the processed data is located in the `data/processed` directory. This data includes:
-   - `nyc_hexes.geojson` – the geospatial grid for NYC
-   - `permits_wide.csv` – the permit counts data
-
----
-
-## Usage
-
-To launch the dashboard locally, run:
-```bash
-python src/app.py
-```
-
-The app will start on [http://127.0.0.1:8050](http://127.0.0.1:8050). Open this link in your browser to interact with the dashboard.
-
----
-
-## Project Structure
-
-```
-.
-├── assets
-│   ├── background.png         # Image assets
-│   └── style.css              # Custom CSS styles
-├── codebase.md                # Project tree view and documentation
-├── data
-│   └── processed              # Preprocessed geospatial and permit data
-│       ├── nyc_hexes.geojson
-│       └── permits_wide.csv
-├── pyproject.toml             # Project configuration and dependency management
-├── run_codeweaver.bat         # Batch script for documentation generation (Windows)
-├── src
-│   ├── app.py                 # Application entry point
-│   ├── app_instance.py        # Dash app and server instance setup
-│   ├── callbacks.py           # All interactive component callbacks
-│   ├── config.py              # Configuration settings
-│   ├── data_utils.py          # Data processing and visualization utility functions
-│   ├── debug.py               # Debugging tools
-│   └── layout.py              # Dashboard layout definitions
-└── uv.lock                    # Dependency lock file
-```
-
----
-
-## Technology Stack
-
-- **Python** – Core programming language.
-- **Dash & Plotly** – For creating interactive web-based visualizations.
-- **GeoPandas & Pandas** – For data manipulation and geospatial analysis.
-- **Dash Bootstrap Components** – For responsive and attractive UI components.
-- **Uvicorn & ASGI** – (Optional) For deploying the app in an asynchronous production setting.
-
----
-
-## Data Science & Development Highlights
-
-- **Advanced Data Manipulation:** Efficient aggregation and transformation of permit data, including time-series grouping and dynamic geospatial mapping.
-- **Interactive Visualization:** Real-time updates across multiple charts and maps with advanced Dash callbacks.
-- **Modular and Scalable Codebase:** Leveraging best practices in software engineering by separating concerns into distinct modules (data utilities, layout, callbacks, configuration).
-- **Logging & Debugging:** Comprehensive logging throughout the data processing pipeline, facilitating easier identification and resolution of issues.
-- **Deployment Ready:** Configured for local debugging with potential for asynchronous deployment using ASGI and Uvicorn.
-
----
-
-## Contributing
-
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/yourusername/nyc-building-permit-dashboard/issues).
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Commit your changes (`git commit -m 'Add some feature'`).
-4. Push to your branch (`git push origin feature/your-feature`).
-5. Open a Pull Request.
-
----
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-## Author
-
-Created by [David Leather](https://daveleather.com). Explore more of my work and connect with me on [GitHub](https://github.com/dleather).
-
----
-
-Happy coding!
 
 ```
 
@@ -440,7 +110,21 @@ dependencies = [
 REM This batch file runs CodeWeaver in the current directory
 REM and excludes the specified directories and files from the documentation.
 
-C:\Users\davle\go\bin\CodeWeaver.exe -input . -ignore="\.git.*,__pycache__,\.venv,node_modules,build,.*\.log,temp,data"
+REM Define ignore list patterns (each pattern on its own line for clarity)
+set "IGNORE_LIST=\.git.*"
+set "IGNORE_LIST=%IGNORE_LIST%,__pycache__"
+set "IGNORE_LIST=%IGNORE_LIST%,\.venv"
+set "IGNORE_LIST=%IGNORE_LIST%,node_modules"
+set "IGNORE_LIST=%IGNORE_LIST%,build"
+set "IGNORE_LIST=%IGNORE_LIST%,.*\.log"
+set "IGNORE_LIST=%IGNORE_LIST%,temp"
+set "IGNORE_LIST=%IGNORE_LIST%,^data(/|\\)"
+set "IGNORE_LIST=%IGNORE_LIST%,README.html"
+set "IGNORE_LIST=%IGNORE_LIST%,README.md"
+set "IGNORE_LIST=%IGNORE_LIST%,README_files"
+
+REM Run CodeWeaver using the ignore list
+C:\Users\davle\go\bin\CodeWeaver.exe -input . -ignore="%IGNORE_LIST%"
 
 REM Pause so you can see any output in the command window before it closes.
 pause
@@ -512,15 +196,13 @@ from src.data_utils import (
     quarters,
     quarter_to_index,
     create_map_for_single_quarter,
-    create_map_for_aggregated
+    create_map_for_aggregated,
+    hex_geojson,
+    permit_counts_wide
 )
 
 import numpy as np
 import pandas as pd
-
-# Suppose you have a global "permit_counts_wide" for the time-series
-# or some other dataset to plot in the time-series
-from src.data_utils import permit_counts_wide
 
 logger = logging.getLogger(__name__)
 
@@ -666,24 +348,92 @@ def advance_current_quarter(n_intervals, global_filter):
     Input("global_filter", "data")
 )
 def update_quarterly_map(global_filter):
-    logger.info(f"Updating quarterly map with global_filter: {global_filter}")
-    
     current_idx = global_filter.get("currentQuarterIndex", 0)
     permit_type = global_filter.get("permitType", "NB")
+    start_idx = global_filter.get("startQuarterIndex", 0)
+    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    selected_hex = global_filter.get("selectedHexes", [])
     
-    logger.info(f"Current index: {current_idx}, Permit type: {permit_type}")
-    
-    # Clamp the index
-    if current_idx < 0 or current_idx >= len(quarters):
-        current_idx = 0
-    
-    # Convert index -> quarter label
     quarter_label = quarters[current_idx]
-    logger.info(f"Quarter label: {quarter_label}")
+    start_label = quarters[start_idx]
+    end_label = quarters[end_idx]
     
-    # Now call the data utility to build the figure
-    fig = create_map_for_single_quarter(quarter_label, permit_type)
-    logger.info(f"Figure created with data: {bool(fig.data)}")
+    # Get the permit data for the current quarter.
+    sub_quarter = permit_counts_wide.loc[
+        permit_counts_wide["period"] == quarter_label,
+        ["h3_index", "period", permit_type]
+    ]
+    
+    # If any hexes are selected, filter down.
+    if len(selected_hex) > 0:
+        sub_quarter = sub_quarter[sub_quarter["h3_index"].isin(selected_hex)]
+    
+    # If nothing remains, return an empty figure.
+    if sub_quarter.empty:
+        fig = px.choropleth_mapbox()
+        fig.update_layout(
+            title_text="No data (or no hexes selected) for this quarter",
+            mapbox_style="carto-positron",
+            margin={"r": 0, "t": 0, "l": 0, "b": 0}
+        )
+        return fig
+    
+    # Re-compute subrange max on data in the selected subrange.
+    sub = permit_counts_wide[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label)
+    ]
+    if len(selected_hex) > 0:
+        sub = sub[sub["h3_index"].isin(selected_hex)]
+    subrange_max = sub[permit_type].max(skipna=True) if not sub.empty else 0
+    
+    # Decide whether to use a log scale based on the maximum.
+    USE_LOG = (subrange_max > 20)
+    if USE_LOG:
+        # Create a log-transformed column.
+        sub_quarter["log_count"] = np.log10(sub_quarter[permit_type] + 1)
+        cmin = 0
+        cmax = np.log10(subrange_max + 1) if subrange_max > 0 else 1
+        color_col = "log_count"
+    else:
+        cmin = 0
+        cmax = subrange_max
+        color_col = permit_type
+    
+    fig = px.choropleth_mapbox(
+        sub_quarter,
+        geojson=hex_geojson,
+        locations="h3_index",
+        featureidkey="properties.h3_index",
+        color=color_col,
+        color_continuous_scale="Reds",
+        range_color=(cmin, cmax),
+        zoom=9,
+        center={"lat": 40.7, "lon": -73.9},
+        opacity=0.6,
+        mapbox_style="carto-positron"
+    )
+    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    
+    if USE_LOG:
+        possible_ticks = np.arange(0, 7)
+        tick_vals = [v for v in possible_ticks if v <= cmax]
+        tick_text = [f"{10**v:.0f}" for v in tick_vals]
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                tickmode="array",
+                tickvals=tick_vals,
+                ticktext=tick_text,
+                title=f"{permit_type}",
+            )
+        )
+    else:
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                title=f"{permit_type}"
+            )
+        )
+    
     return fig
 
 
@@ -695,23 +445,82 @@ def update_quarterly_map(global_filter):
     Input("global_filter", "data")
 )
 def update_aggregated_map(global_filter):
-    """
-    Displays aggregated data from startQuarterIndex to endQuarterIndex.
-    """
-    start_idx = global_filter.get("startQuarterIndex", 0)
-    end_idx   = global_filter.get("endQuarterIndex", len(quarters) - 1)
     permit_type = global_filter.get("permitType", "NB")
-
-    # Clamp
-    if start_idx < 0: start_idx = 0
-    if end_idx >= len(quarters):
-        end_idx = len(quarters) - 1
-
-    # Convert indices -> quarter labels
+    start_idx = global_filter.get("startQuarterIndex", 0)
+    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    selected_hex = global_filter.get("selectedHexes", [])
+    
     start_label = quarters[start_idx]
-    end_label   = quarters[end_idx]
-
-    fig = create_map_for_aggregated(start_label, end_label, permit_type)
+    end_label = quarters[end_idx]
+    
+    # Get the data over the subrange.
+    sub = permit_counts_wide[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label)
+    ]
+    if len(selected_hex) > 0:
+        sub = sub[sub["h3_index"].isin(selected_hex)]
+    
+    # If nothing is left, return an empty figure.
+    if sub.empty:
+        fig = px.choropleth_mapbox()
+        fig.update_layout(
+            title_text="No data (or no hexes selected) for selected time range",
+            mapbox_style="carto-positron",
+            margin={"r": 0, "t": 0, "l": 0, "b": 0}
+        )
+        return fig
+    
+    # Aggregate permit counts across the subrange.
+    grouped = sub.groupby("h3_index", as_index=False)[permit_type].sum()
+    
+    # Compute the maximum aggregated permit count.
+    agg_max = grouped[permit_type].max(skipna=True)
+    USE_LOG = (agg_max > 20)
+    if USE_LOG:
+        grouped["log_count"] = np.log10(grouped[permit_type] + 1)
+        cmin = 0
+        cmax = np.log10(agg_max + 1) if agg_max > 0 else 1
+        color_col = "log_count"
+    else:
+        cmin = 0
+        cmax = agg_max
+        color_col = permit_type
+    
+    fig = px.choropleth_mapbox(
+        grouped,
+        geojson=hex_geojson,
+        locations="h3_index",
+        featureidkey="properties.h3_index",
+        color=color_col,
+        color_continuous_scale="Reds",
+        range_color=(cmin, cmax),
+        zoom=9,
+        center={"lat": 40.7, "lon": -73.9},
+        opacity=0.6,
+        mapbox_style="carto-positron"
+    )
+    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    
+    if USE_LOG:
+        possible_ticks = np.arange(0, 7)
+        tick_vals = [v for v in possible_ticks if v <= cmax]
+        tick_text = [f"{10**v:.0f}" for v in tick_vals]
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                tickmode="array",
+                tickvals=tick_vals,
+                ticktext=tick_text,
+                title=f"{permit_type}",
+            )
+        )
+    else:
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                title=f"{permit_type}"
+            )
+        )
+    
     return fig
 
 
@@ -800,13 +609,350 @@ def update_time_series(global_filter):
 
     return fig
 
+# ------------------------------------------------------------------------------
+# 10) UPDATE THE SELECTED HEXES
+# ------------------------------------------------------------------------------
+@app.callback(
+    Output("global_filter", "data", allow_duplicate=True),
+    Input("map-quarterly", "selectedData"),
+    Input("map-aggregated", "selectedData"),
+    State("global_filter", "data"),
+    prevent_initial_call=True
+)
+def update_selected_hexes(quarterly_sel, aggregated_sel, global_filter):
+    """
+    Whenever user selects hexes on EITHER map, unify that selection.
+    We store them in global_filter["selectedHexes"].
+    """
+    ctx = dash.callback_context
 
+    # Which input triggered the callback?
+    if not ctx.triggered or (quarterly_sel is None and aggregated_sel is None):
+        return global_filter
+
+    # Helper to extract h3 indices from the 'selectedData'
+    def extract_hexes(selectedData):
+        """
+        'selectedData' is typically a dict with structure:
+            {
+                "points": [
+                    {"location": "h3_index_string", ...},
+                    {"location": "h3_index_string", ...},
+                    ...
+                ]
+            }
+        We want to return a list of those location values.
+        """
+        if not selectedData or "points" not in selectedData:
+            return []
+        return [p["location"] for p in selectedData["points"] if "location" in p]
+
+    # Extract from whichever map triggered
+    q_hexes = extract_hexes(quarterly_sel)
+    a_hexes = extract_hexes(aggregated_sel)
+
+    # Here you can decide on how to combine them:
+    # Option A: Overwrite the selection with the most recently used map
+    # Option B: Union them
+    # For simplicity, let's assume we want to unify them:
+    newly_selected = set(q_hexes) | set(a_hexes)
+
+    # If you prefer to *only* keep the last map's selection, do:
+    # newly_selected = set(q_hexes if q_hexes else a_hexes)
+
+    global_filter["selectedHexes"] = list(newly_selected)
+    return global_filter
+
+# ------------------------------------------------------------------------------
+# 11) Clear Button -> Clear the selected hexes
+# ------------------------------------------------------------------------------
+@app.callback(
+    Output("global_filter", "data", allow_duplicate=True),
+    Input("clear-hexes", "n_clicks"),
+    State("global_filter", "data"),
+    prevent_initial_call=True
+)
+def clear_hex_selection(n_clicks, global_filter):
+    if n_clicks:
+        global_filter["selectedHexes"] = []
+    return global_filter
 ```
 
 ## src\config.py
 ```py
 PROCESSED_DATA_PATH = "data/processed"
 ANIMATION_INTERVAL = 1000
+
+```
+
+## src\data_utils.py
+```py
+import geopandas as gpd
+import pandas as pd
+import json
+import numpy as np
+from pathlib import Path
+from src.config import PROCESSED_DATA_PATH
+import plotly.express as px
+import logging
+import os
+import numpy as np
+import plotly.express as px
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logger.info("=== Starting data_utils.py ===")
+logger.info(f"Current working directory: {os.getcwd()}")
+logger.info(f"PROCESSED_DATA_PATH: {PROCESSED_DATA_PATH}")
+logger.info(f"Does data path exist? {os.path.exists(PROCESSED_DATA_PATH)}")
+
+# Check for specific files
+hex_file = f"{PROCESSED_DATA_PATH}/nyc_hexes.geojson"
+permits_file = f"{PROCESSED_DATA_PATH}/permits_wide.csv"
+
+logger.info(f"Does {hex_file} exist? {os.path.exists(hex_file)}")
+logger.info(f"Does {permits_file} exist? {os.path.exists(permits_file)}")
+
+# Load hex data and do necessary type conversions:
+hex_gdf = gpd.read_file(f"{PROCESSED_DATA_PATH}/nyc_hexes.geojson")
+hex_gdf['h3_index'] = hex_gdf['h3_index'].astype(str)
+hex_geojson = json.loads(hex_gdf.to_json())
+
+logger.info(f"Loaded hex_gdf with shape: {hex_gdf.shape}")
+logger.info(f"Sample h3_index values: {hex_gdf['h3_index'].head().tolist()}")
+
+# Load permits data:
+permit_counts_path = Path(f"{PROCESSED_DATA_PATH}/permits_wide.csv")
+permit_counts_wide = pd.read_csv(permit_counts_path)
+
+logger.info(f"Loaded permit_counts_wide with shape: {permit_counts_wide.shape}")
+logger.info(f"Available columns: {permit_counts_wide.columns.tolist()}")
+logger.info(f"Sample periods: {permit_counts_wide['period'].unique()[:5].tolist()}")
+
+# Compute quarters & mapping:
+quarters = sorted(permit_counts_wide['period'].unique())
+quarter_to_index = {q: i for i, q in enumerate(quarters)}
+
+# Permit options and their list:
+permit_options = [
+    {"label": "New Building", "value": "NB"},
+    {"label": "Demolition", "value": "DM"},
+    {"label": "Type I - Major Alteration (A1)", "value": "A1"},
+    {"label": "Type II - Minor Alteration (A2)", "value": "A2"},
+    {"label": "Type III - Minor Alteration (A3)", "value": "A3"},
+    {"label": "All Permits", "value": "total_permit_count"}
+]
+permit_type_list = [opt["value"] for opt in permit_options]
+
+# Precompute global color scales for each permit type:
+global_color_scales = {}
+for pt in permit_type_list:
+    val_series = permit_counts_wide[pt]
+    if val_series.empty:
+        global_min = 0
+        global_max = 0
+    else:
+        global_min = val_series.min()
+        global_max = np.percentile(val_series, 99)
+    global_color_scales[pt] = (global_min, global_max)
+
+def create_map_for_single_quarter(quarter_label: str, 
+                                  start_quarter: str, 
+                                  end_quarter: str, 
+                                  permit_type: str):
+    """
+    Show the distribution for one particular quarter (quarter_label),
+    but color scale is normalized to the *subrange* [start_quarter..end_quarter].
+    """
+    # (1) The data for just this one quarter
+    sub_quarter = permit_counts_wide.loc[
+        permit_counts_wide["period"] == quarter_label,
+        ["h3_index", "period", permit_type]
+    ]
+    if sub_quarter.empty:
+        fig = px.choropleth_mapbox()
+        fig.update_layout(title_text="No data for selected quarter.")
+        return fig
+    
+    # (2) Find the max single-quarter value *across the entire subrange*
+    # so that all quarters in that subrange share the same scale
+    subrange_max = get_subrange_singlequarter_max(permit_type, start_quarter, end_quarter)
+    # e.g. subrange_max = sub_quarter[permit_type].max() 
+    # if you only want to scale to *this* quarter’s max. But we want subrange scale.
+    
+    # (3) Decide on log vs. linear
+    USE_LOG = (subrange_max > 20)
+    
+    if USE_LOG:
+        sub_quarter["log_count"] = np.log10(sub_quarter[permit_type] + 1.0)
+        cmin = 0
+        cmax = np.log10(subrange_max + 1.0)
+        color_col = "log_count"
+    else:
+        cmin = 0
+        cmax = subrange_max
+        color_col = permit_type
+    
+    # (4) Build the figure
+    fig = px.choropleth_mapbox(
+        sub_quarter,
+        geojson=hex_geojson,
+        locations="h3_index",
+        featureidkey="properties.h3_index",
+        color=color_col,
+        color_continuous_scale="Reds",
+        range_color=(cmin, cmax),
+        zoom=9,
+        center={"lat": 40.7, "lon": -73.9},
+        opacity=0.6,
+        mapbox_style="carto-positron"
+    )
+    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+    
+    if USE_LOG:
+        # Possibly define custom ticks in log space
+        possible_ticks = np.arange(0, 7)
+        tick_vals = [v for v in possible_ticks if v <= cmax]
+        tick_text = [f"{10**v:.0f}" for v in tick_vals]
+        
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                tickmode="array",
+                tickvals=tick_vals,
+                ticktext=tick_text,
+                title=f"{permit_type}",
+            )
+        )
+    else:
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                title=f"{permit_type}"
+            )
+        )
+    
+    return fig
+
+
+
+def create_map_for_aggregated(start_quarter: str, end_quarter: str, permit_type: str):
+    """
+    Build a choropleth that sums the chosen permit type from start_quarter..end_quarter.
+    The color scale is normalized *only* for that subrange, so it re-scales each time
+    the user changes start/end. We optionally apply a log scale if the subrange max is big.
+    """
+    
+    sub = permit_counts_wide.loc[
+        (permit_counts_wide["period"] >= start_quarter) &
+        (permit_counts_wide["period"] <= end_quarter),
+        ["h3_index", "period", permit_type]
+    ]
+    if sub.empty:
+        fig = px.choropleth_mapbox()
+        fig.update_layout(title_text="No data for selected time range.")
+        return fig
+    
+    # (1) Sum across the subrange
+    grouped = sub.groupby("h3_index", as_index=False)[permit_type].sum()
+
+    # (2) Find the subrange-wide aggregated max
+    agg_max = grouped[permit_type].max()
+    
+    # (3) Decide on log vs. linear
+    USE_LOG = (agg_max > 20)  # or pick your own threshold
+    if USE_LOG:
+        grouped["log_count"] = np.log10(grouped[permit_type] + 1.0)
+        cmin = 0
+        cmax = np.log10(agg_max + 1.0)
+        color_col = "log_count"
+    else:
+        cmin = 0
+        cmax = agg_max
+        color_col = permit_type
+    
+    # (4) Build the figure
+    fig = px.choropleth_mapbox(
+        grouped,
+        geojson=hex_geojson,
+        locations="h3_index",
+        featureidkey="properties.h3_index",
+        color=color_col,
+        color_continuous_scale="Reds",
+        range_color=(cmin, cmax),
+        zoom=9,
+        center={"lat": 40.7, "lon": -73.9},
+        opacity=0.6,
+        mapbox_style="carto-positron",
+    )
+    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+    
+    # (5) Customize the colorbar
+    if USE_LOG:
+        # Example: custom log ticks at powers of 10
+        # E.g. 0 => 10^0=1, 1 => 10^1=10, etc.
+        # Filter to only show ticks up to cmax
+        possible_ticks = np.arange(0, 7)  # 0..6
+        tick_vals = [v for v in possible_ticks if v <= cmax]
+        tick_text = [f"{10**v:.0f}" for v in tick_vals]
+        
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                tickmode="array",
+                tickvals=tick_vals,
+                ticktext=tick_text,
+                title=f"{permit_type}",
+            )
+        )
+    else:
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                title=f"{permit_type}"
+            )
+        )
+    
+    return fig
+
+def get_subrange_singlequarter_max(permit_type: str, start_label: str, end_label: str) -> float:
+    """
+    Return the maximum single-quarter count of `permit_type` over all
+    quarters in [start_label, end_label].
+    
+    For each row in that date range (each (quarter, h3_index)), 
+    we just look at the raw value (not summed across quarters).
+    """
+    sub = permit_counts_wide[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label)
+    ]
+    if sub.empty:
+        return 0  # or np.nan
+    
+    return sub[permit_type].max(skipna=True)
+
+
+def get_subrange_aggregated_max(permit_type: str, start_label: str, end_label: str) -> float:
+    """
+    Return the maximum aggregated sum of `permit_type` across the subrange [start_label, end_label].
+    
+    - We sum the permit counts from start_label..end_label for each hex.
+    - Then find the max over all hexes.
+    """
+    sub = permit_counts_wide[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label)
+    ]
+    if sub.empty:
+        return 0  # or np.nan
+
+    grouped = sub.groupby("h3_index")[permit_type].sum()
+    return grouped.max(skipna=True)
+
+
+# Expose these variables for use in callbacks and layout:
+__all__ = [
+    "hex_geojson", "permit_counts_wide", "quarters", "quarter_to_index",
+    "permit_options", "permit_type_list", "global_color_scales"
+]
 
 ```
 
@@ -976,7 +1122,8 @@ layout = dbc.Container(
                 "currentQuarterIndex": 0,
                 "permitType": "NB",
                 "play": False,
-                "speed": 1000
+                "speed": 1000,
+                "selectedHexes": []
             }
         ),
         dcc.Interval(

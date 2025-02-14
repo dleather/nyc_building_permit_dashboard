@@ -15,15 +15,13 @@ from src.data_utils import (
     quarters,
     quarter_to_index,
     create_map_for_single_quarter,
-    create_map_for_aggregated
+    create_map_for_aggregated,
+    hex_geojson,
+    permit_counts_wide
 )
 
 import numpy as np
 import pandas as pd
-
-# Suppose you have a global "permit_counts_wide" for the time-series
-# or some other dataset to plot in the time-series
-from src.data_utils import permit_counts_wide
 
 logger = logging.getLogger(__name__)
 
@@ -171,20 +169,90 @@ def advance_current_quarter(n_intervals, global_filter):
 def update_quarterly_map(global_filter):
     current_idx = global_filter.get("currentQuarterIndex", 0)
     permit_type = global_filter.get("permitType", "NB")
-    start_idx   = global_filter.get("startQuarterIndex", 0)
-    end_idx     = global_filter.get("endQuarterIndex", len(quarters)-1)
+    start_idx = global_filter.get("startQuarterIndex", 0)
+    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    selected_hex = global_filter.get("selectedHexes", [])
     
-    # Convert indices to strings
     quarter_label = quarters[current_idx]
-    start_label   = quarters[start_idx]
-    end_label     = quarters[end_idx]
+    start_label = quarters[start_idx]
+    end_label = quarters[end_idx]
     
-    fig = create_map_for_single_quarter(
-        quarter_label=quarter_label,
-        start_quarter=start_label,
-        end_quarter=end_label,
-        permit_type=permit_type
+    # Get the permit data for the current quarter.
+    sub_quarter = permit_counts_wide.loc[
+        permit_counts_wide["period"] == quarter_label,
+        ["h3_index", "period", permit_type]
+    ]
+    
+    # If any hexes are selected, filter down.
+    if len(selected_hex) > 0:
+        sub_quarter = sub_quarter[sub_quarter["h3_index"].isin(selected_hex)]
+    
+    # If nothing remains, return an empty figure.
+    if sub_quarter.empty:
+        fig = px.choropleth_mapbox()
+        fig.update_layout(
+            title_text="No data (or no hexes selected) for this quarter",
+            mapbox_style="carto-positron",
+            margin={"r": 0, "t": 0, "l": 0, "b": 0}
+        )
+        return fig
+    
+    # Re-compute subrange max on data in the selected subrange.
+    sub = permit_counts_wide[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label)
+    ]
+    if len(selected_hex) > 0:
+        sub = sub[sub["h3_index"].isin(selected_hex)]
+    subrange_max = sub[permit_type].max(skipna=True) if not sub.empty else 0
+    
+    # Decide whether to use a log scale based on the maximum.
+    USE_LOG = (subrange_max > 20)
+    if USE_LOG:
+        # Create a log-transformed column.
+        sub_quarter["log_count"] = np.log10(sub_quarter[permit_type] + 1)
+        cmin = 0
+        cmax = np.log10(subrange_max + 1) if subrange_max > 0 else 1
+        color_col = "log_count"
+    else:
+        cmin = 0
+        cmax = subrange_max
+        color_col = permit_type
+    
+    fig = px.choropleth_mapbox(
+        sub_quarter,
+        geojson=hex_geojson,
+        locations="h3_index",
+        featureidkey="properties.h3_index",
+        color=color_col,
+        color_continuous_scale="Reds",
+        range_color=(cmin, cmax),
+        zoom=9,
+        center={"lat": 40.7, "lon": -73.9},
+        opacity=0.6,
+        mapbox_style="carto-positron"
     )
+    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    
+    if USE_LOG:
+        possible_ticks = np.arange(0, 7)
+        tick_vals = [v for v in possible_ticks if v <= cmax]
+        tick_text = [f"{10**v:.0f}" for v in tick_vals]
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                tickmode="array",
+                tickvals=tick_vals,
+                ticktext=tick_text,
+                title=f"{permit_type}",
+            )
+        )
+    else:
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                title=f"{permit_type}"
+            )
+        )
+    
     return fig
 
 
@@ -197,17 +265,81 @@ def update_quarterly_map(global_filter):
 )
 def update_aggregated_map(global_filter):
     permit_type = global_filter.get("permitType", "NB")
-    start_idx   = global_filter.get("startQuarterIndex", 0)
-    end_idx     = global_filter.get("endQuarterIndex", len(quarters)-1)
+    start_idx = global_filter.get("startQuarterIndex", 0)
+    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    selected_hex = global_filter.get("selectedHexes", [])
     
     start_label = quarters[start_idx]
-    end_label   = quarters[end_idx]
+    end_label = quarters[end_idx]
     
-    fig = create_map_for_aggregated(
-        start_quarter=start_label,
-        end_quarter=end_label,
-        permit_type=permit_type
+    # Get the data over the subrange.
+    sub = permit_counts_wide[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label)
+    ]
+    if len(selected_hex) > 0:
+        sub = sub[sub["h3_index"].isin(selected_hex)]
+    
+    # If nothing is left, return an empty figure.
+    if sub.empty:
+        fig = px.choropleth_mapbox()
+        fig.update_layout(
+            title_text="No data (or no hexes selected) for selected time range",
+            mapbox_style="carto-positron",
+            margin={"r": 0, "t": 0, "l": 0, "b": 0}
+        )
+        return fig
+    
+    # Aggregate permit counts across the subrange.
+    grouped = sub.groupby("h3_index", as_index=False)[permit_type].sum()
+    
+    # Compute the maximum aggregated permit count.
+    agg_max = grouped[permit_type].max(skipna=True)
+    USE_LOG = (agg_max > 20)
+    if USE_LOG:
+        grouped["log_count"] = np.log10(grouped[permit_type] + 1)
+        cmin = 0
+        cmax = np.log10(agg_max + 1) if agg_max > 0 else 1
+        color_col = "log_count"
+    else:
+        cmin = 0
+        cmax = agg_max
+        color_col = permit_type
+    
+    fig = px.choropleth_mapbox(
+        grouped,
+        geojson=hex_geojson,
+        locations="h3_index",
+        featureidkey="properties.h3_index",
+        color=color_col,
+        color_continuous_scale="Reds",
+        range_color=(cmin, cmax),
+        zoom=9,
+        center={"lat": 40.7, "lon": -73.9},
+        opacity=0.6,
+        mapbox_style="carto-positron"
     )
+    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+    
+    if USE_LOG:
+        possible_ticks = np.arange(0, 7)
+        tick_vals = [v for v in possible_ticks if v <= cmax]
+        tick_text = [f"{10**v:.0f}" for v in tick_vals]
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                tickmode="array",
+                tickvals=tick_vals,
+                ticktext=tick_text,
+                title=f"{permit_type}",
+            )
+        )
+    else:
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                title=f"{permit_type}"
+            )
+        )
+    
     return fig
 
 
@@ -296,3 +428,70 @@ def update_time_series(global_filter):
 
     return fig
 
+# ------------------------------------------------------------------------------
+# 10) UPDATE THE SELECTED HEXES
+# ------------------------------------------------------------------------------
+@app.callback(
+    Output("global_filter", "data", allow_duplicate=True),
+    Input("map-quarterly", "selectedData"),
+    Input("map-aggregated", "selectedData"),
+    State("global_filter", "data"),
+    prevent_initial_call=True
+)
+def update_selected_hexes(quarterly_sel, aggregated_sel, global_filter):
+    """
+    Whenever user selects hexes on EITHER map, unify that selection.
+    We store them in global_filter["selectedHexes"].
+    """
+    ctx = dash.callback_context
+
+    # Which input triggered the callback?
+    if not ctx.triggered or (quarterly_sel is None and aggregated_sel is None):
+        return global_filter
+
+    # Helper to extract h3 indices from the 'selectedData'
+    def extract_hexes(selectedData):
+        """
+        'selectedData' is typically a dict with structure:
+            {
+                "points": [
+                    {"location": "h3_index_string", ...},
+                    {"location": "h3_index_string", ...},
+                    ...
+                ]
+            }
+        We want to return a list of those location values.
+        """
+        if not selectedData or "points" not in selectedData:
+            return []
+        return [p["location"] for p in selectedData["points"] if "location" in p]
+
+    # Extract from whichever map triggered
+    q_hexes = extract_hexes(quarterly_sel)
+    a_hexes = extract_hexes(aggregated_sel)
+
+    # Here you can decide on how to combine them:
+    # Option A: Overwrite the selection with the most recently used map
+    # Option B: Union them
+    # For simplicity, let's assume we want to unify them:
+    newly_selected = set(q_hexes) | set(a_hexes)
+
+    # If you prefer to *only* keep the last map's selection, do:
+    # newly_selected = set(q_hexes if q_hexes else a_hexes)
+
+    global_filter["selectedHexes"] = list(newly_selected)
+    return global_filter
+
+# ------------------------------------------------------------------------------
+# 11) Clear Button -> Clear the selected hexes
+# ------------------------------------------------------------------------------
+@app.callback(
+    Output("global_filter", "data", allow_duplicate=True),
+    Input("clear-hexes", "n_clicks"),
+    State("global_filter", "data"),
+    prevent_initial_call=True
+)
+def clear_hex_selection(n_clicks, global_filter):
+    if n_clicks:
+        global_filter["selectedHexes"] = []
+    return global_filter

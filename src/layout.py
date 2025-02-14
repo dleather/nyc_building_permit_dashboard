@@ -130,7 +130,8 @@ layout = dbc.Container(
                 "currentQuarterIndex": 0,
                 "permitType": "NB",
                 "play": False,
-                "speed": 1000
+                "speed": 1000,
+                "selectedHexes": []
             }
         ),
         dcc.Interval(
