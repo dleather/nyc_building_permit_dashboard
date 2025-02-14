@@ -69,18 +69,27 @@ layout = dbc.Container(
                         ),
                     ], className="mb-3"),
 
-                    # Optional hidden quarter slider
-                    dcc.Slider(
-                        id='period-slider',
-                        min=0,
-                        max=len(quarters) - 1,
-                        value=0,
-                        marks={i: quarters[i] for i in range(
-                               0, len(quarters), max(1, len(quarters) // 8))},
-                        step=None,
-                        tooltip={"placement": "bottom"},
-                        className="d-none"
-                    ),
+                    # Time Range Slider
+                    html.Div([
+                        html.Label("Select Time Range:"),
+                        dcc.RangeSlider(
+                            id='period-range-slider',
+                            min=0,
+                            max=len(quarters) - 1,
+                            value=[0, len(quarters) - 1],
+                            step=1,
+                            marks={
+                                i: quarters[i]
+                                for i in range(
+                                    0,
+                                    len(quarters),
+                                    max(1, len(quarters) // 8)
+                                )
+                            },
+                            tooltip={"placement": "bottom"}
+                        ),
+                    ], className="mb-3"),
+
                 ], className="p-3 bg-light rounded")
             ], width=4),
         ], className="my-3"),

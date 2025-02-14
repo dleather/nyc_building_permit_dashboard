@@ -35,42 +35,68 @@ debug_div = html.Div([
 # ------------------------------------------------------------------------------
 # 1) TIME-SERIES: BRUSH -> UPDATE GLOBAL_FILTER (startQuarterIndex, endQuarterIndex)
 # ------------------------------------------------------------------------------
+# @app.callback(
+#     Output("global_filter", "data", allow_duplicate=True),
+#     Input("time-series", "selectedData"),       # Brushing on the time-series
+#     State("global_filter", "data"),
+#     prevent_initial_call=True
+# )
+# def update_time_range_from_timeseries(selected_data, global_filter):
+#     """
+#     When the user brushes on the time-series, set startQuarterIndex/endQuarterIndex in global_filter.
+#     If nothing is selected, reset to the full range (or do nothing).
+#     """
+#     if not selected_data:
+#         # No selection => maybe revert to the entire range
+#         global_filter["startQuarterIndex"] = 0
+#         global_filter["endQuarterIndex"]   = len(quarters) - 1
+#         return global_filter
+
+#     # selected_data["points"] is a list of points that were selected
+#     # We'll read their x-values to see which quarter indices were chosen
+#     x_indices = [pt["x"] for pt in selected_data.get("points", [])]
+#     if x_indices:
+#         start_idx = int(np.floor(min(x_indices)))
+#         end_idx   = int(np.ceil(max(x_indices)))
+#         # clamp to valid
+#         start_idx = max(0, start_idx)
+#         end_idx   = min(len(quarters) - 1, end_idx)
+#         global_filter["startQuarterIndex"] = start_idx
+#         global_filter["endQuarterIndex"]   = end_idx
+#     else:
+#         # if there's a range brush, you might check selected_data["range"]["x"]
+#         # or else reset if no points:
+#         global_filter["startQuarterIndex"] = 0
+#         global_filter["endQuarterIndex"]   = len(quarters) - 1
+
+#     return global_filter
+
 @app.callback(
     Output("global_filter", "data", allow_duplicate=True),
-    Input("time-series", "selectedData"),       # Brushing on the time-series
+    Input("period-range-slider", "value"),
     State("global_filter", "data"),
     prevent_initial_call=True
 )
-def update_time_range_from_timeseries(selected_data, global_filter):
+def update_range_slider(range_value, global_filter):
     """
-    When the user brushes on the time-series, set startQuarterIndex/endQuarterIndex in global_filter.
-    If nothing is selected, reset to the full range (or do nothing).
+    range_value will be [start_idx, end_idx].
+    We'll store them in global_filter and return it.
     """
-    if not selected_data:
-        # No selection => maybe revert to the entire range
-        global_filter["startQuarterIndex"] = 0
-        global_filter["endQuarterIndex"]   = len(quarters) - 1
-        return global_filter
+    if range_value is None or len(range_value) != 2:
+        return global_filter  # no change
 
-    # selected_data["points"] is a list of points that were selected
-    # We'll read their x-values to see which quarter indices were chosen
-    x_indices = [pt["x"] for pt in selected_data.get("points", [])]
-    if x_indices:
-        start_idx = int(np.floor(min(x_indices)))
-        end_idx   = int(np.ceil(max(x_indices)))
-        # clamp to valid
-        start_idx = max(0, start_idx)
-        end_idx   = min(len(quarters) - 1, end_idx)
-        global_filter["startQuarterIndex"] = start_idx
-        global_filter["endQuarterIndex"]   = end_idx
-    else:
-        # if there's a range brush, you might check selected_data["range"]["x"]
-        # or else reset if no points:
-        global_filter["startQuarterIndex"] = 0
-        global_filter["endQuarterIndex"]   = len(quarters) - 1
+    start_idx, end_idx = range_value
+    start_idx = int(start_idx)
+    end_idx = int(end_idx)
+
+    # clamp them just in case
+    start_idx = max(0, min(start_idx, len(quarters)-1))
+    end_idx   = max(0, min(end_idx, len(quarters)-1))
+
+    global_filter["startQuarterIndex"] = start_idx
+    global_filter["endQuarterIndex"]   = end_idx
 
     return global_filter
-
 
 # ------------------------------------------------------------------------------
 # 2) PERMIT TYPE RADIO -> UPDATE PERMIT TYPE IN GLOBAL_FILTER
