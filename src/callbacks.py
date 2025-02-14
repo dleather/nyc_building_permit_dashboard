@@ -33,43 +33,8 @@ debug_div = html.Div([
 ], style={'display': 'none'})  # Set to 'block' to see debug output
 
 # ------------------------------------------------------------------------------
-# 1) TIME-SERIES: BRUSH -> UPDATE GLOBAL_FILTER (startQuarterIndex, endQuarterIndex)
+# 1) UPDATE GLOBAL_FILTER BASED ON TIME RANGE SLIDER SELECTION
 # ------------------------------------------------------------------------------
-# @app.callback(
-#     Output("global_filter", "data", allow_duplicate=True),
-#     Input("time-series", "selectedData"),       # Brushing on the time-series
-#     State("global_filter", "data"),
-#     prevent_initial_call=True
-# )
-# def update_time_range_from_timeseries(selected_data, global_filter):
-#     """
-#     When the user brushes on the time-series, set startQuarterIndex/endQuarterIndex in global_filter.
-#     If nothing is selected, reset to the full range (or do nothing).
-#     """
-#     if not selected_data:
-#         # No selection => maybe revert to the entire range
-#         global_filter["startQuarterIndex"] = 0
-#         global_filter["endQuarterIndex"]   = len(quarters) - 1
-#         return global_filter
-
-#     # selected_data["points"] is a list of points that were selected
-#     # We'll read their x-values to see which quarter indices were chosen
-#     x_indices = [pt["x"] for pt in selected_data.get("points", [])]
-#     if x_indices:
-#         start_idx = int(np.floor(min(x_indices)))
-#         end_idx   = int(np.ceil(max(x_indices)))
-#         # clamp to valid
-#         start_idx = max(0, start_idx)
-#         end_idx   = min(len(quarters) - 1, end_idx)
-#         global_filter["startQuarterIndex"] = start_idx
-#         global_filter["endQuarterIndex"]   = end_idx
-#     else:
-#         # if there's a range brush, you might check selected_data["range"]["x"]
-#         # or else reset if no points:
-#         global_filter["startQuarterIndex"] = 0
-#         global_filter["endQuarterIndex"]   = len(quarters) - 1
-
-#     return global_filter
 
 @app.callback(
     Output("global_filter", "data", allow_duplicate=True),
@@ -95,6 +60,11 @@ def update_range_slider(range_value, global_filter):
 
     global_filter["startQuarterIndex"] = start_idx
     global_filter["endQuarterIndex"]   = end_idx
+    
+    # If currentQuarterIndex is outside [start_idx, end_idx], clamp to start_idx
+    current_idx = global_filter.get("currentQuarterIndex", 0)
+    if current_idx < start_idx or current_idx > end_idx:
+        global_filter["currentQuarterIndex"] = start_idx
 
     return global_filter
 

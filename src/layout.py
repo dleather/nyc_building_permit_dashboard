@@ -111,7 +111,11 @@ layout = dbc.Container(
             dbc.Col(
                 html.Div([
                     html.Hr(),
-                    html.P("Created by Me. Data from NYC Open Data, etc.", className="text-center")
+                    html.P([
+                        "Created by ", 
+                        html.A("David Leather", href="https://daveleather.com", target="_blank"), 
+                        ". Data from NYC Department of Buildings."
+                    ], className="text-center")
                 ]),
                 width=12
             )

@@ -208,44 +208,40 @@ debug_div = html.Div([
 ], style={'display': 'none'})  # Set to 'block' to see debug output
 
 # ------------------------------------------------------------------------------
-# 1) TIME-SERIES: BRUSH -> UPDATE GLOBAL_FILTER (startQuarterIndex, endQuarterIndex)
+# 1) UPDATE GLOBAL_FILTER BASED ON TIME RANGE SLIDER SELECTION
 # ------------------------------------------------------------------------------
+
 @app.callback(
     Output("global_filter", "data", allow_duplicate=True),
-    Input("time-series", "selectedData"),       # Brushing on the time-series
+    Input("period-range-slider", "value"),
     State("global_filter", "data"),
     prevent_initial_call=True
 )
-def update_time_range_from_timeseries(selected_data, global_filter):
+def update_range_slider(range_value, global_filter):
     """
-    When the user brushes on the time-series, set startQuarterIndex/endQuarterIndex in global_filter.
-    If nothing is selected, reset to the full range (or do nothing).
+    range_value will be [start_idx, end_idx].
+    We'll store them in global_filter and return it.
     """
-    if not selected_data:
-        # No selection => maybe revert to the entire range
-        global_filter["startQuarterIndex"] = 0
-        global_filter["endQuarterIndex"]   = len(quarters) - 1
-        return global_filter
+    if range_value is None or len(range_value) != 2:
+        return global_filter  # no change
 
-    # selected_data["points"] is a list of points that were selected
-    # We'll read their x-values to see which quarter indices were chosen
-    x_indices = [pt["x"] for pt in selected_data.get("points", [])]
-    if x_indices:
-        start_idx = int(np.floor(min(x_indices)))
-        end_idx   = int(np.ceil(max(x_indices)))
-        # clamp to valid
-        start_idx = max(0, start_idx)
-        end_idx   = min(len(quarters) - 1, end_idx)
-        global_filter["startQuarterIndex"] = start_idx
-        global_filter["endQuarterIndex"]   = end_idx
-    else:
-        # if there's a range brush, you might check selected_data["range"]["x"]
-        # or else reset if no points:
-        global_filter["startQuarterIndex"] = 0
-        global_filter["endQuarterIndex"]   = len(quarters) - 1
+    start_idx, end_idx = range_value
+    start_idx = int(start_idx)
+    end_idx = int(end_idx)
+
+    # clamp them just in case
+    start_idx = max(0, min(start_idx, len(quarters)-1))
+    end_idx   = max(0, min(end_idx, len(quarters)-1))
+
+    global_filter["startQuarterIndex"] = start_idx
+    global_filter["endQuarterIndex"]   = end_idx
+    
+    # If currentQuarterIndex is outside [start_idx, end_idx], clamp to start_idx
+    current_idx = global_filter.get("currentQuarterIndex", 0)
+    if current_idx < start_idx or current_idx > end_idx:
+        global_filter["currentQuarterIndex"] = start_idx
 
     return global_filter
-
 
 # ------------------------------------------------------------------------------
 # 2) PERMIT TYPE RADIO -> UPDATE PERMIT TYPE IN GLOBAL_FILTER
@@ -597,18 +593,27 @@ layout = dbc.Container(
                         ),
                     ], className="mb-3"),
 
-                    # Optional hidden quarter slider
-                    dcc.Slider(
-                        id='period-slider',
-                        min=0,
-                        max=len(quarters) - 1,
-                        value=0,
-                        marks={i: quarters[i] for i in range(
-                               0, len(quarters), max(1, len(quarters) // 8))},
-                        step=None,
-                        tooltip={"placement": "bottom"},
-                        className="d-none"
-                    ),
+                    # Time Range Slider
+                    html.Div([
+                        html.Label("Select Time Range:"),
+                        dcc.RangeSlider(
+                            id='period-range-slider',
+                            min=0,
+                            max=len(quarters) - 1,
+                            value=[0, len(quarters) - 1],
+                            step=1,
+                            marks={
+                                i: quarters[i]
+                                for i in range(
+                                    0,
+                                    len(quarters),
+                                    max(1, len(quarters) // 8)
+                                )
+                            },
+                            tooltip={"placement": "bottom"}
+                        ),
+                    ], className="mb-3"),
+
                 ], className="p-3 bg-light rounded")
             ], width=4),
         ], className="my-3"),
@@ -630,7 +635,11 @@ layout = dbc.Container(
             dbc.Col(
                 html.Div([
                     html.Hr(),
-                    html.P("Created by Me. Data from NYC Open Data, etc.", className="text-center")
+                    html.P([
+                        "Created by ", 
+                        html.A("David Leather", href="https://daveleather.com", target="_blank"), 
+                        ". Data from NYC Department of Buildings."
+                    ], className="text-center")
                 ]),
                 width=12
             )

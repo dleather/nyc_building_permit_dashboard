@@ -117,24 +117,31 @@ def create_map_for_aggregated(start_quarter: str, end_quarter: str, permit_type:
     :return: A Plotly figure with the aggregated data.
     """
     
-    # Filter to rows where period is between start_quarter and end_quarter
-    # This assumes quarter strings sort lexicographically in the correct order 
-    # (like "2019Q1" < "2019Q2" < ...). If not, you might need a more robust comparison.
-    mask = (permit_counts_wide["period"] >= start_quarter) & \
-           (permit_counts_wide["period"] <= end_quarter)
+    # 1) Filter rows to the chosen time range
+    mask = (
+        (permit_counts_wide["period"] >= start_quarter)
+        & (permit_counts_wide["period"] <= end_quarter)
+    )
     data_range = permit_counts_wide.loc[mask, ["h3_index", permit_type]]
     
+    # 2) If no data for this range -> return an empty figure
     if data_range.empty:
         fig = px.choropleth_map()
         fig.update_layout(title_text="No data for selected time range.")
         return fig
     
-    # Group by h3_index and sum the chosen permit column
+    # 3) Group by h3_index, summing the chosen permit column
     grouped = data_range.groupby("h3_index", as_index=False)[permit_type].sum()
     
-    # Get the color scale range for this permit type
-    cmin, cmax = global_color_scales[permit_type]
+    # 4) Dynamically compute the color scale min/max from the data
+    cmin = grouped[permit_type].min()
+    cmax = grouped[permit_type].max()
+    
+    # If cmin == cmax, give a small range so we don’t get a zero-width color scale
+    if cmin == cmax:
+        cmax = cmin + 1
 
+    # 5) Build the choropleth (adjust to your actual function name if needed)
     fig = px.choropleth_map(
         grouped,
         geojson=hex_geojson,
@@ -142,15 +149,17 @@ def create_map_for_aggregated(start_quarter: str, end_quarter: str, permit_type:
         featureidkey="properties.h3_index",
         color=permit_type,
         color_continuous_scale="Reds",
-        range_color=(cmin, cmax),
+        range_color=(cmin, cmax),  # Renormalize each time based on this subset
         map_style="basic",
         zoom=9,
         center={"lat": 40.7, "lon": -73.9},
         opacity=0.6,
         labels={permit_type: permit_type}
     )
+    
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     return fig
+
 
 # Expose these variables for use in callbacks and layout:
 __all__ = [
