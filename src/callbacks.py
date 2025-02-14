@@ -4,11 +4,12 @@ from dash.dependencies import Input, Output, State
 import dash
 from dash import no_update, html
 from src.app_instance import app
-from src.data_utils import permit_options
+from src.data_utils import permit_options, build_quarterly_figure_faded_px, build_quarterly_figure_two_traces, get_permit_label
 import logging
 
 # Plotly for the time-series figure:
 import plotly.express as px
+import plotly.graph_objs as go
 
 # Data and helper functions
 from src.data_utils import (
@@ -17,7 +18,9 @@ from src.data_utils import (
     create_map_for_single_quarter,
     create_map_for_aggregated,
     hex_geojson,
-    permit_counts_wide
+    permit_counts_wide,
+    get_subrange_singlequarter_max,
+    get_subrange_aggregated_max
 )
 
 import numpy as np
@@ -29,6 +32,7 @@ logger = logging.getLogger(__name__)
 debug_div = html.Div([
     html.Pre(id='debug-output', style={'whiteSpace': 'pre-wrap'}),
 ], style={'display': 'none'})  # Set to 'block' to see debug output
+
 
 # ------------------------------------------------------------------------------
 # 1) UPDATE GLOBAL_FILTER BASED ON TIME RANGE SLIDER SELECTION
@@ -169,90 +173,39 @@ def advance_current_quarter(n_intervals, global_filter):
 def update_quarterly_map(global_filter):
     current_idx = global_filter.get("currentQuarterIndex", 0)
     permit_type = global_filter.get("permitType", "NB")
-    start_idx = global_filter.get("startQuarterIndex", 0)
-    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    start_idx   = global_filter.get("startQuarterIndex", 0)
+    end_idx     = global_filter.get("endQuarterIndex", len(quarters) - 1)
     selected_hex = global_filter.get("selectedHexes", [])
-    
+
     quarter_label = quarters[current_idx]
-    start_label = quarters[start_idx]
-    end_label = quarters[end_idx]
-    
-    # Get the permit data for the current quarter.
-    sub_quarter = permit_counts_wide.loc[
-        permit_counts_wide["period"] == quarter_label,
-        ["h3_index", "period", permit_type]
-    ]
-    
-    # If any hexes are selected, filter down.
-    if len(selected_hex) > 0:
-        sub_quarter = sub_quarter[sub_quarter["h3_index"].isin(selected_hex)]
-    
-    # If nothing remains, return an empty figure.
-    if sub_quarter.empty:
+    start_label   = quarters[start_idx]
+    end_label     = quarters[end_idx]
+
+    df_current = permit_counts_wide.loc[permit_counts_wide["period"] == quarter_label].copy()
+    if df_current.empty:
         fig = px.choropleth_mapbox()
         fig.update_layout(
-            title_text="No data (or no hexes selected) for this quarter",
+            # Removed inline title; title will be provided by layout outside the graph
             mapbox_style="carto-positron",
-            margin={"r": 0, "t": 0, "l": 0, "b": 0}
+            margin={"r":0, "t":0, "l":0, "b":0}
         )
         return fig
-    
-    # Re-compute subrange max on data in the selected subrange.
-    sub = permit_counts_wide[
-        (permit_counts_wide["period"] >= start_label) &
-        (permit_counts_wide["period"] <= end_label)
-    ]
-    if len(selected_hex) > 0:
-        sub = sub[sub["h3_index"].isin(selected_hex)]
-    subrange_max = sub[permit_type].max(skipna=True) if not sub.empty else 0
-    
-    # Decide whether to use a log scale based on the maximum.
-    USE_LOG = (subrange_max > 20)
-    if USE_LOG:
-        # Create a log-transformed column.
-        sub_quarter["log_count"] = np.log10(sub_quarter[permit_type] + 1)
-        cmin = 0
-        cmax = np.log10(subrange_max + 1) if subrange_max > 0 else 1
-        color_col = "log_count"
-    else:
-        cmin = 0
-        cmax = subrange_max
-        color_col = permit_type
-    
-    fig = px.choropleth_mapbox(
-        sub_quarter,
-        geojson=hex_geojson,
-        locations="h3_index",
-        featureidkey="properties.h3_index",
-        color=color_col,
-        color_continuous_scale="Reds",
-        range_color=(cmin, cmax),
-        zoom=9,
-        center={"lat": 40.7, "lon": -73.9},
-        opacity=0.6,
-        mapbox_style="carto-positron"
+
+    from src.data_utils import get_subrange_singlequarter_max
+    cmax_base = get_subrange_singlequarter_max(permit_type, start_label, end_label)
+
+    fig = build_quarterly_figure_two_traces(
+        df=df_current,
+        selected_hex=selected_hex,
+        permit_type=permit_type,
+        hex_geojson=hex_geojson,
+        cmin_base=0,
+        cmax_base=cmax_base,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        current_idx=current_idx
     )
-    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
-    
-    if USE_LOG:
-        possible_ticks = np.arange(0, 7)
-        tick_vals = [v for v in possible_ticks if v <= cmax]
-        tick_text = [f"{10**v:.0f}" for v in tick_vals]
-        fig.update_layout(
-            coloraxis_colorbar=dict(
-                tickmode="array",
-                tickvals=tick_vals,
-                ticktext=tick_text,
-                title=f"{permit_type}",
-            )
-        )
-    else:
-        fig.update_layout(
-            coloraxis_colorbar=dict(
-                title=f"{permit_type}"
-            )
-        )
-    
+    # Do not set the title here; the layout markdown will show the title.
     return fig
 
 
@@ -264,82 +217,72 @@ def update_quarterly_map(global_filter):
     Input("global_filter", "data")
 )
 def update_aggregated_map(global_filter):
-    permit_type = global_filter.get("permitType", "NB")
-    start_idx = global_filter.get("startQuarterIndex", 0)
-    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    permit_type  = global_filter.get("permitType", "NB")
+    start_idx    = global_filter.get("startQuarterIndex", 0)
+    end_idx      = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    current_idx  = global_filter.get("currentQuarterIndex", 0)
     selected_hex = global_filter.get("selectedHexes", [])
-    
+
     start_label = quarters[start_idx]
-    end_label = quarters[end_idx]
-    
-    # Get the data over the subrange.
-    sub = permit_counts_wide[
+    end_label   = quarters[end_idx]
+    permit_label = get_permit_label(permit_type)
+
+    df_sub = permit_counts_wide.loc[
         (permit_counts_wide["period"] >= start_label) &
         (permit_counts_wide["period"] <= end_label)
-    ]
-    if len(selected_hex) > 0:
-        sub = sub[sub["h3_index"].isin(selected_hex)]
-    
-    # If nothing is left, return an empty figure.
-    if sub.empty:
+    ].copy()
+
+    if df_sub.empty:
         fig = px.choropleth_mapbox()
         fig.update_layout(
-            title_text="No data (or no hexes selected) for selected time range",
+            title_text="No data for selected time range.",
             mapbox_style="carto-positron",
-            margin={"r": 0, "t": 0, "l": 0, "b": 0}
+            margin={"r":0,"t":0,"l":0,"b":0}
         )
         return fig
-    
-    # Aggregate permit counts across the subrange.
-    grouped = sub.groupby("h3_index", as_index=False)[permit_type].sum()
-    
-    # Compute the maximum aggregated permit count.
-    agg_max = grouped[permit_type].max(skipna=True)
-    USE_LOG = (agg_max > 20)
-    if USE_LOG:
-        grouped["log_count"] = np.log10(grouped[permit_type] + 1)
-        cmin = 0
-        cmax = np.log10(agg_max + 1) if agg_max > 0 else 1
-        color_col = "log_count"
-    else:
-        cmin = 0
-        cmax = agg_max
-        color_col = permit_type
-    
-    fig = px.choropleth_mapbox(
-        grouped,
-        geojson=hex_geojson,
-        locations="h3_index",
-        featureidkey="properties.h3_index",
-        color=color_col,
-        color_continuous_scale="Reds",
-        range_color=(cmin, cmax),
-        zoom=9,
-        center={"lat": 40.7, "lon": -73.9},
-        opacity=0.6,
-        mapbox_style="carto-positron"
+
+    # Aggregate
+    df_agg = df_sub.groupby("h3_index", as_index=False)[permit_type].sum()
+
+    # If we have selected hexes that might be 0, ensure they are present:
+    if selected_hex:
+        sel_df = pd.DataFrame({"h3_index": selected_hex})
+        df_agg = pd.merge(df_agg, sel_df, on="h3_index", how="outer")
+        df_agg[permit_type] = df_agg[permit_type].fillna(0)
+
+    if df_agg.empty:
+        fig = px.choropleth_mapbox()
+        fig.update_layout(
+            title_text="No aggregated data for selection/time range",
+            mapbox_style="carto-positron",
+            margin={"r":0,"t":0,"l":0,"b":0}
+        )
+        return fig
+
+    # cmax for base = max of all hexes
+    cmax_all = df_agg[permit_type].max()
+    # cmax for selected = max of selected hexes
+    cmax_sel = df_agg.loc[df_agg["h3_index"].isin(selected_hex), permit_type].max() if selected_hex else cmax_all
+    if pd.isna(cmax_sel):
+        cmax_sel = 0
+
+    fig = build_quarterly_figure_two_traces(
+        df=df_agg,
+        selected_hex=selected_hex,
+        permit_type=permit_type,
+        hex_geojson=hex_geojson,
+        cmin_base=0,
+        cmax_base=cmax_all,
+        cmin_selected=0,
+        cmax_selected=cmax_sel,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        current_idx=current_idx
     )
-    fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
-    
-    if USE_LOG:
-        possible_ticks = np.arange(0, 7)
-        tick_vals = [v for v in possible_ticks if v <= cmax]
-        tick_text = [f"{10**v:.0f}" for v in tick_vals]
-        fig.update_layout(
-            coloraxis_colorbar=dict(
-                tickmode="array",
-                tickvals=tick_vals,
-                ticktext=tick_text,
-                title=f"{permit_type}",
-            )
-        )
-    else:
-        fig.update_layout(
-            coloraxis_colorbar=dict(
-                title=f"{permit_type}"
-            )
-        )
-    
+
+    # Default drag mode
+    fig.update_layout(dragmode='select')
+    # Add a title that uses the permit_label and date range
     return fig
 
 
@@ -351,45 +294,33 @@ def update_aggregated_map(global_filter):
     Input("global_filter", "data")
 )
 def update_time_series(global_filter):
-    """
-    Simple example: plot total permits over all quarters for the chosen permit type.
-    Optionally highlight the range (start_idx -> end_idx) or the current quarter.
-    """
     permit_type = global_filter.get("permitType", "NB")
-    start_idx = global_filter.get("startQuarterIndex", 0)
-    end_idx   = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    # remove the title from the px.line creation or update_layout call
+    start_idx   = global_filter.get("startQuarterIndex", 0)
+    end_idx     = global_filter.get("endQuarterIndex", len(quarters) - 1)
     current_idx = global_filter.get("currentQuarterIndex", 0)
+    selected_hexes = global_filter.get("selectedHexes", [])
 
-    # Build a simple line chart from permit_counts_wide
-    # that sums over all hexes (or do something more granular if you like)
-    agg_ts = permit_counts_wide.groupby("period")[permit_type].sum().reset_index()
-    # Create a numeric index to plot on x-axis
+    if selected_hexes:
+        df_filtered = permit_counts_wide[permit_counts_wide["h3_index"].isin(selected_hexes)]
+    else:
+        df_filtered = permit_counts_wide
+
+    agg_ts = df_filtered.groupby("period")[permit_type].sum().reset_index()
     agg_ts["quarter_idx"] = agg_ts["period"].map(quarter_to_index)
-
-    # Get proper permit labels
-    permit_label = None
-    for opt in permit_options:
-        if opt["value"] == permit_type:
-            permit_label = opt["label"]
-            break
-
-    if permit_label is None:
-        permit_label = permit_type  # fallback
 
     fig = px.line(
         agg_ts,
         x="quarter_idx",
         y=permit_type,
-        title=f"Time-Series of {permit_label}" + " Permits Issued",
+        # Remove the title here – we'll set it separately.
         template="plotly_white",
         markers=True
     )
-
     fig.update_layout(
-        xaxis_title="Time Period",  # rename the x-axis
-        yaxis_title=permit_label,   # rename the y-axis
-        shapes=[
-            # your existing shapes
+        xaxis_title="Time Period",
+        yaxis_title=get_permit_label(permit_type),
+        shapes=[  # shaded areas and current time line
             dict(
                 type="rect",
                 xref="x",
@@ -416,17 +347,14 @@ def update_time_series(global_filter):
         ],
         xaxis=dict(range=[-0.5, len(quarters) - 0.5])
     )
-
-    # Show every 4th tick, rotated 45 degrees
-    tick_indices = list(range(0, len(quarters), 4))
     fig.update_xaxes(
         tickmode='array',
-        tickvals=tick_indices,  # Every 4th numeric x-value
-        ticktext=[quarters[i] for i in tick_indices],  # Corresponding quarter labels
-        tickangle=45  # Rotate labels 45 degrees
+        tickvals=list(range(0, len(quarters), 4)),
+        ticktext=[quarters[i] for i in range(0, len(quarters), 4)],
+        tickangle=45
     )
-
     return fig
+
 
 # ------------------------------------------------------------------------------
 # 10) UPDATE THE SELECTED HEXES
@@ -495,3 +423,25 @@ def clear_hex_selection(n_clicks, global_filter):
     if n_clicks:
         global_filter["selectedHexes"] = []
     return global_filter
+
+@app.callback(
+    [Output("map-quarterly-title", "children"),
+     Output("map-aggregated-title", "children"),
+     Output("time-series-title", "children")],
+    Input("global_filter", "data")
+)
+def update_titles(global_filter):
+    permit_type = global_filter.get("permitType", "NB")
+    permit_label = get_permit_label(permit_type)
+    
+    start_idx = global_filter.get("startQuarterIndex", 0)
+    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    start_label = quarters[start_idx]
+    end_label = quarters[end_idx]
+    
+    # Compute the titles for each section
+    quarterly_title = f"{permit_label} Permits Issued Across Space and Time"
+    aggregated_title = f"{permit_label} Permits Issued from {start_label} - {end_label} (select hexes here)"
+    time_series_title = f"Time-Series of {permit_label}"
+    
+    return quarterly_title, aggregated_title, time_series_title
