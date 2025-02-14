@@ -4,7 +4,10 @@ from dash.dependencies import Input, Output, State
 import dash
 from dash import no_update, html
 from src.app_instance import app
-from src.data_utils import permit_options, build_quarterly_figure_faded_px, build_quarterly_figure_two_traces, get_permit_label
+from src.data_utils import permit_options, build_quarterly_figure_faded_px
+from src.data_utils import build_quarterly_figure_two_traces, get_permit_label
+from src.data_utils import ensure_all_hexes, global_agg_99, ensure_all_hexes
+from src.data_utils import global_quarterly_99, build_two_trace_mapbox
 import logging
 
 # Plotly for the time-series figure:
@@ -166,46 +169,61 @@ def advance_current_quarter(n_intervals, global_filter):
 # ------------------------------------------------------------------------------
 # 7) UPDATE THE QUARTERLY MAP (id="map-quarterly") FROM GLOBAL_FILTER
 # ------------------------------------------------------------------------------
+from src.data_utils import ensure_all_hexes, global_quarterly_99, all_hexes
+
 @app.callback(
     Output("map-quarterly", "figure"),
     Input("global_filter", "data")
 )
 def update_quarterly_map(global_filter):
-    current_idx = global_filter.get("currentQuarterIndex", 0)
     permit_type = global_filter.get("permitType", "NB")
-    start_idx   = global_filter.get("startQuarterIndex", 0)
-    end_idx     = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    current_idx = global_filter.get("currentQuarterIndex", 0)
     selected_hex = global_filter.get("selectedHexes", [])
 
     quarter_label = quarters[current_idx]
-    start_label   = quarters[start_idx]
-    end_label     = quarters[end_idx]
 
-    df_current = permit_counts_wide.loc[permit_counts_wide["period"] == quarter_label].copy()
+    # ------------------------------------------------------------------
+    # 1) Build the "base" DF for the current quarter
+    # ------------------------------------------------------------------
+    df_current = permit_counts_wide.loc[
+        permit_counts_wide["period"] == quarter_label
+    ].copy()
     if df_current.empty:
-        fig = px.choropleth_mapbox()
-        fig.update_layout(
-            # Removed inline title; title will be provided by layout outside the graph
-            mapbox_style="carto-positron",
-            margin={"r":0, "t":0, "l":0, "b":0}
-        )
-        return fig
+        return px.choropleth_mapbox()
 
-    from src.data_utils import get_subrange_singlequarter_max
-    cmax_base = get_subrange_singlequarter_max(permit_type, start_label, end_label)
+    df_current = ensure_all_hexes(df_current, permit_type)
 
-    fig = build_quarterly_figure_two_traces(
-        df=df_current,
-        selected_hex=selected_hex,
+    # Base layer color scale
+    cmin_base = 0
+    cmax_base = global_quarterly_99[permit_type]  # or your old logic
+
+    # ------------------------------------------------------------------
+    # 2) If no selection => treat as "select everything"
+    # ------------------------------------------------------------------
+    if not selected_hex:
+        selected_hex = df_current["h3_index"].tolist()
+
+    df_top = df_current[df_current["h3_index"].isin(selected_hex)]
+    if df_top.empty:
+        df_top = df_current.copy()
+
+    cmin_top = 0
+    cmax_top = df_top[permit_type].max()
+
+    # ------------------------------------------------------------------
+    # 3) Build 2‐trace figure
+    # ------------------------------------------------------------------
+    fig = build_two_trace_mapbox(
+        df_base=df_current,
+        df_top=df_top,
         permit_type=permit_type,
-        hex_geojson=hex_geojson,
-        cmin_base=0,
+        cmin_base=cmin_base,
         cmax_base=cmax_base,
-        start_idx=start_idx,
-        end_idx=end_idx,
-        current_idx=current_idx
+        cmin_top=cmin_top,
+        cmax_top=cmax_top,
+        current_idx=current_idx,
+        map_title="Quarterly View"
     )
-    # Do not set the title here; the layout markdown will show the title.
     return fig
 
 
@@ -225,64 +243,58 @@ def update_aggregated_map(global_filter):
 
     start_label = quarters[start_idx]
     end_label   = quarters[end_idx]
-    permit_label = get_permit_label(permit_type)
 
+    # ----------------------------------------------------------------------
+    # 1) Build the "base" DF as usual: sum over subrange, fill missing with 0
+    # ----------------------------------------------------------------------
     df_sub = permit_counts_wide.loc[
         (permit_counts_wide["period"] >= start_label) &
         (permit_counts_wide["period"] <= end_label)
     ].copy()
-
     if df_sub.empty:
-        fig = px.choropleth_mapbox()
-        fig.update_layout(
-            title_text="No data for selected time range.",
-            mapbox_style="carto-positron",
-            margin={"r":0,"t":0,"l":0,"b":0}
-        )
-        return fig
+        # Return some empty figure
+        return px.choropleth_mapbox()
 
-    # Aggregate
     df_agg = df_sub.groupby("h3_index", as_index=False)[permit_type].sum()
+    df_agg = ensure_all_hexes(df_agg, permit_type)  # fill zero for missing
 
-    # If we have selected hexes that might be 0, ensure they are present:
-    if selected_hex:
-        sel_df = pd.DataFrame({"h3_index": selected_hex})
-        df_agg = pd.merge(df_agg, sel_df, on="h3_index", how="outer")
-        df_agg[permit_type] = df_agg[permit_type].fillna(0)
+    # Base color scale (faint layer):
+    cmin_base = 0
+    cmax_base = global_agg_99[permit_type]  # or your old logic
 
-    if df_agg.empty:
-        fig = px.choropleth_mapbox()
-        fig.update_layout(
-            title_text="No aggregated data for selection/time range",
-            mapbox_style="carto-positron",
-            margin={"r":0,"t":0,"l":0,"b":0}
-        )
-        return fig
+    # ----------------------------------------------------------------------
+    # 2) If no selection => treat as "select everything"
+    # ----------------------------------------------------------------------
+    if not selected_hex: 
+        selected_hex = df_agg["h3_index"].tolist()
 
-    # cmax for base = max of all hexes
-    cmax_all = df_agg[permit_type].max()
-    # cmax for selected = max of selected hexes
-    cmax_sel = df_agg.loc[df_agg["h3_index"].isin(selected_hex), permit_type].max() if selected_hex else cmax_all
-    if pd.isna(cmax_sel):
-        cmax_sel = 0
+    # Now gather the top‐layer subset
+    df_top = df_agg[df_agg["h3_index"].isin(selected_hex)]
+    if df_top.empty:
+        # Edge case: if somehow nothing matches, fallback
+        df_top = df_agg.copy()
 
-    fig = build_quarterly_figure_two_traces(
-        df=df_agg,
-        selected_hex=selected_hex,
+    # cmax for the top layer is *just the selected subset*
+    # Or you might do 99th percentile => np.percentile(df_top[permit_type], 99)
+    cmin_top = 0
+    cmax_top = df_top[permit_type].max()
+
+    # ----------------------------------------------------------------------
+    # 3) Build the 2‐trace figure
+    #    - Base layer is faint, no colorbar
+    #    - Top layer colorbar is from [0..max(selected)]
+    # ----------------------------------------------------------------------
+    fig = build_two_trace_mapbox(
+        df_base=df_agg,
+        df_top=df_top,
         permit_type=permit_type,
-        hex_geojson=hex_geojson,
-        cmin_base=0,
-        cmax_base=cmax_all,
-        cmin_selected=0,
-        cmax_selected=cmax_sel,
-        start_idx=start_idx,
-        end_idx=end_idx,
-        current_idx=current_idx
+        cmin_base=cmin_base,
+        cmax_base=cmax_base,
+        cmin_top=cmin_top,
+        cmax_top=cmax_top,
+        current_idx=current_idx,
+        map_title="Aggregated View"
     )
-
-    # Default drag mode
-    fig.update_layout(dragmode='select')
-    # Add a title that uses the permit_label and date range
     return fig
 
 

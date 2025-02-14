@@ -47,6 +47,8 @@ logger.info(f"Sample periods: {permit_counts_wide['period'].unique()[:5].tolist(
 quarters = sorted(permit_counts_wide['period'].unique())
 quarter_to_index = {q: i for i, q in enumerate(quarters)}
 
+
+
 # Permit options and their list:
 permit_options = [
     {"label": "New Building (NB)", "value": "NB"},
@@ -69,6 +71,49 @@ for pt in permit_type_list:
         global_min = val_series.min()
         global_max = np.percentile(val_series, 99)
     global_color_scales[pt] = (global_min, global_max)
+    
+# ----------------------------------------------------------------
+# Precompute the global 99th percentile for single-quarter values:
+# (We look at each row's permit_type value, ignoring sums across quarters)
+global_quarterly_99 = {}
+for pt in permit_type_list:
+    # All single-quarter values for that permit type:
+    val_series = permit_counts_wide[pt].fillna(0)
+    if len(val_series) == 0:
+        global_quarterly_99[pt] = 0
+    else:
+        global_quarterly_99[pt] = np.percentile(val_series, 99)
+
+# ----------------------------------------------------------------
+# Precompute the global 99th percentile for aggregated values:
+# (Sum across all quarters for each hex, for each permit type)
+global_agg_99 = {}
+for pt in permit_type_list:
+    # Group by hex, summing across *all* quarters in the entire dataset:
+    sub = permit_counts_wide.groupby("h3_index", as_index=False)[pt].sum()
+    val_series = sub[pt].fillna(0)
+    if len(val_series) == 0:
+        global_agg_99[pt] = 0
+    else:
+        global_agg_99[pt] = np.percentile(val_series, 99)
+        
+all_hexes = hex_gdf["h3_index"].unique().tolist()
+
+def ensure_all_hexes(df, permit_type):
+    """
+    Given a DF with columns ["h3_index", permit_type],
+    return a DF that has *all* hexes, filling missing counts with 0.
+    """
+    # Make sure 'h3_index' is the index, then reindex
+    df = df.set_index("h3_index")
+    # Reindex to *all* hexes
+    df = df.reindex(all_hexes)
+    # Fill missing count with 0
+    df[permit_type] = df[permit_type].fillna(0)
+    # Move h3_index back to a column
+    df.reset_index(inplace=True)
+    df.rename(columns={"index": "h3_index"}, inplace=True)
+    return df
     
 def get_permit_label(permit_value):
     from src.data_utils import permit_options
@@ -507,8 +552,116 @@ def build_log_ticks(new_cmax):
     tick_text = [f"{10**v:.0f}" for v in tick_vals]
     return tick_vals, tick_text
 
+def build_two_trace_mapbox(
+    df_base,
+    df_top,
+    permit_type,
+    cmin_base,
+    cmax_base,
+    cmin_top,
+    cmax_top,
+    current_idx=None,
+    map_title=None
+):
+    import plotly.graph_objects as go
+    import numpy as np
+
+    # Make sure to fillna(0) or ensure data is present
+    df_base = df_base.copy()
+    df_base[permit_type] = df_base[permit_type].fillna(0)
+
+    df_top = df_top.copy()
+    df_top[permit_type] = df_top[permit_type].fillna(0)
+
+    # Decide log-scaling for base layer
+    use_log_base = (cmax_base > 20)
+    if use_log_base:
+        df_base["display_value"] = np.log10(df_base[permit_type] + 1.0)
+        new_cmin_base = 0
+        new_cmax_base = np.log10(cmax_base + 1.0)
+    else:
+        df_base["display_value"] = df_base[permit_type]
+        new_cmin_base = cmin_base
+        new_cmax_base = cmax_base
+
+    # Decide log-scaling for top layer
+    use_log_top = (cmax_top > 20)
+    if use_log_top:
+        df_top["display_value"] = np.log10(df_top[permit_type] + 1.0)
+        new_cmin_top = 0
+        new_cmax_top = np.log10(cmax_top + 1.0)
+    else:
+        df_top["display_value"] = df_top[permit_type]
+        new_cmin_top = cmin_top
+        new_cmax_top = cmax_top
+
+    # Base trace
+    base_trace = go.Choroplethmapbox(
+        geojson=hex_geojson,
+        featureidkey="properties.h3_index",
+        locations=df_base["h3_index"],
+        z=df_base["display_value"],
+        zmin=new_cmin_base,
+        zmax=new_cmax_base,
+        colorscale="Reds",
+        marker_line_width=0.3,
+        marker_line_color="#999",
+        marker_opacity=0.4,    # faint
+        showscale=False,       # hide base colorbar
+        hoverinfo="skip",
+        name="Base (faint)"
+    )
+
+    # Build colorbar for top trace
+    if use_log_top:
+        tick_vals, tick_text = build_log_ticks(new_cmax_top)
+        colorbar_props = dict(
+            tickmode="array",
+            tickvals=tick_vals,
+            ticktext=tick_text,
+            title=f"{permit_type}"
+        )
+    else:
+        colorbar_props = dict(title=f"{permit_type}")
+
+    # Top trace (only subset)
+    top_trace = go.Choroplethmapbox(
+        geojson=hex_geojson,
+        featureidkey="properties.h3_index",
+        locations=df_top["h3_index"],
+        z=df_top["display_value"],
+        zmin=new_cmin_top,
+        zmax=new_cmax_top,
+        colorscale="Reds",
+        marker_line_width=1.0,
+        marker_line_color="#333",
+        marker_opacity=0.9,     # highlight
+        showscale=True,         # show top colorbar only
+        colorbar=colorbar_props,
+        hoverinfo="location+z",
+        name="Selected"
+    )
+
+    fig = go.Figure([base_trace, top_trace])
+    fig.update_layout(
+        mapbox=dict(
+            style="carto-positron",
+            center={"lat": 40.7, "lon": -73.9},
+            zoom=9
+        ),
+        margin=dict(r=0, t=30, l=0, b=0),
+        title=dict(
+            text=map_title if map_title else "",
+            x=0.5
+        ),
+        dragmode="select"
+    )
+    return fig
+
+
 # Expose these variables for use in callbacks and layout:
 __all__ = [
     "hex_geojson", "permit_counts_wide", "quarters", "quarter_to_index",
-    "permit_options", "permit_type_list", "global_color_scales"
+    "permit_options", "permit_type_list", "global_color_scales", "global_quarterly_99",
+    "global_agg_99", "ensure_all_hexes"
 ]
