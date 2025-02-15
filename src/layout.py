@@ -8,11 +8,19 @@ from src.debug import debug_div
 
 layout = dbc.Container(
     fluid=True,
+    style={
+        'backgroundColor': 'rgb(10, 10, 10)',
+        'color': 'rgba(255, 255, 255, 0.8)',
+        'minHeight': '100vh'
+    },
     children=[
         # Header
         dbc.Row(
             dbc.Col(
-                html.H1("NYC Permits Dashboard", className="text-center my-3"),
+                html.H1("NYC Permits Dashboard", 
+                    className="text-center my-3",
+                    style={'color': 'rgba(255, 255, 255, 0.9)'}
+                ),
                 width=12
             )
         ),
@@ -21,110 +29,94 @@ layout = dbc.Container(
         dbc.Row([
             dbc.Col(
                 html.Div([
-                    html.H3(id='time-series-title', className="text-center mb-2"),
+                    html.H3(id='time-series-title', 
+                        className="text-center mb-2",
+                        style={'color': 'rgba(255, 255, 255, 0.8)'}
+                    ),
                     dcc.Graph(id='time-series', style={'width': '100%', 'height': '400px'})
                 ]),
                 width=8
             ),
-            # Controls column (same as before)
-            dbc.Col([
+            # Controls column
+            dbc.Col(
                 html.Div([
-                    html.H4("Controls"),
-                    html.Hr(),
-                    # Permit type radios
+                    html.H4("Controls", style={'color': 'rgba(255, 255, 255, 0.8)'}),
+                    html.Hr(style={'borderColor': 'rgba(255, 255, 255, 0.2)'}),
                     html.Div([
-                        html.Label("Permit Type"),
+                        html.Label("Permit Type", style={'color': 'rgba(255, 255, 255, 0.7)'}),
                         dcc.RadioItems(
-                            id='permit-type',
+                            id="permit-type",
                             options=permit_options,
-                            value='NB',
-                            labelStyle={'display': 'block', 'margin': '5px 0'}
+                            value="NB",
+                            className="mb-3",
+                            style={'color': 'rgba(255, 255, 255, 0.7)'},
+                            labelStyle={'marginRight': '10px'}
                         ),
-                    ], className="mb-3"),
-                    # Animation Speed and Time Range Slider
-                    html.Div([
-                        html.Label("Animation Speed:"),
+                        html.Label("Animation Speed:", style={'color': 'rgba(255, 255, 255, 0.7)'}),
                         dcc.Dropdown(
-                            id='speed-dropdown',
+                            id="speed-dropdown",
                             options=[
-                                {'label': 'Slow', 'value': 1000},
-                                {'label': 'Medium', 'value': 750},
-                                {'label': 'Fast', 'value': 500}
+                                {"label": "Slow", "value": 2000},
+                                {"label": "Medium", "value": 1000},
+                                {"label": "Fast", "value": 500}
                             ],
-                            value=750,
-                            clearable=False,
-                            style={'width': '100%'}
+                            value=1000,
+                            className="mb-3",
+                            style={
+                                'backgroundColor': 'rgb(20, 20, 20)',
+                                'color': 'white'
+                            }
+                        ),
+                        html.Label("Select Time Range:", style={'color': 'rgba(255, 255, 255, 0.7)'}),
+                        dcc.RangeSlider(
+                            id="period-range-slider",
+                            min=0,
+                            max=len(quarters) - 1,
+                            value=[0, len(quarters) - 1],
+                            marks={i: quarters[i] for i in range(0, len(quarters), 8)},
+                            className="mb-3"
                         ),
                         html.Div([
-                            html.Label("Select Time Range:"),
-                            dcc.RangeSlider(
-                                id='period-range-slider',
-                                min=0,
-                                max=len(quarters) - 1,
-                                value=[0, len(quarters) - 1],
-                                step=1,
-                                marks={
-                                    i: quarters[i]
-                                    for i in range(0, len(quarters), max(1, len(quarters)//8))
-                                },
-                                tooltip={"placement": "bottom"}
-                            ),
-                        ], className="mb-3"),
-                    ]),
-                    # Add to selection toggle
-                    dcc.RadioItems(
-                        id="add-to-selection-toggle",
-                        options=[
-                            {"label": "Add to selection (union)", "value": "yes"},
-                            {"label": "Replace selection (overwrite)", "value": "no"}
-                        ],
-                        value="yes",  # default value
-                        labelStyle={"display": "inline-block", "margin-right": "10px"}
-                    ),
-                    # Play/Pause/Clear Buttons
-                    html.Div([
-                        html.Button("▶️ Play", id='play-button', n_clicks=0,
-                                    className="btn btn-secondary mb-2"),
-                        html.Button("⏸ Pause", id='pause-button', n_clicks=0,
-                                    className="btn btn-secondary mb-2"),
-                        html.Button("🗓 Clear Time Range", id='clear-time-range', n_clicks=0,
-                                    className="btn btn-secondary mb-2"),
-                        html.Button("🗑️ Clear Hexes", id='clear-hexes', n_clicks=0,
-                                    className="btn btn-secondary mb-2"),
-                    ], className="mb-3")
-                ], className="p-3 bg-light rounded")
-            ], width=4)
-        ], className="my-3"),
+                            dbc.Button("▶ Play", id="play-button", color="primary", className="me-2"),
+                            dbc.Button("⏸ Pause", id="pause-button", color="secondary", className="me-2"),
+                            dbc.Button([html.I(className="fas fa-clock me-1"), "Clear Time Range"], 
+                                     id="clear-time-range", 
+                                     color="info", 
+                                     className="me-2"),
+                            dbc.Button([html.I(className="fas fa-eraser me-1"), "Clear Hexes"], 
+                                     id="clear-hexes", 
+                                     color="warning"),
+                        ], className="d-flex justify-content-start gap-2 mb-3")
+                    ], style={'padding': '15px'})
+                ], style={
+                    'backgroundColor': 'rgb(15, 15, 15)',
+                    'borderRadius': '5px',
+                    'padding': '20px',
+                    'height': '100%'
+                }),
+                width=4
+            )
+        ]),
 
-        # Bottom Row: Titles and Maps
+        # Bottom Row: Maps
         dbc.Row([
             dbc.Col(
                 html.Div([
-                    html.H3(id='map-aggregated-title', className="text-center mb-2"),
-                    dcc.Graph(
-                        id='map-aggregated',
-                        figure={},
-                        style={'width': '100%', 'height': '500px'},
-                        config={
-                            'scrollZoom': True,
-                            'displaylogo': False,
-                            'modeBarButtonsToAdd': ['lasso2d', 'select2d']
-                        }
-                    )
+                    html.H3(id='map-aggregated-title', 
+                        className="text-center mb-2",
+                        style={'color': 'rgba(255, 255, 255, 0.8)'}
+                    ),
+                    dcc.Graph(id='map-aggregated')
                 ]),
                 width=6
             ),
             dbc.Col(
                 html.Div([
-                    html.H3(id='map-quarterly-title', className="text-center mb-2"),
-                    dcc.Graph(
-                        id='map-quarterly',
-                        style={'width': '100%', 'height': '500px'},
-                        config={
-                            'scrollZoom': True,
-                            'displaylogo': False
-                        }
-                    )
+                    html.H3(id='map-quarterly-title', 
+                        className="text-center mb-2",
+                        style={'color': 'rgba(255, 255, 255, 0.8)'}
+                    ),
+                    dcc.Graph(id='map-quarterly')
                 ]),
                 width=6
             )
@@ -134,12 +126,16 @@ layout = dbc.Container(
         dbc.Row(
             dbc.Col(
                 html.Div([
-                    html.Hr(),
+                    html.Hr(style={'borderColor': 'rgba(255, 255, 255, 0.2)'}),
                     html.P([
                         "Created by ",
-                        html.A("David Leather", href="https://daveleather.com", target="_blank"),
+                        html.A("David Leather", 
+                            href="https://daveleather.com",
+                            target="_blank",
+                            style={'color': 'rgba(255, 99, 132, 0.8)'}
+                        ),
                         ". Data from NYC Department of Buildings."
-                    ], className="text-center")
+                    ], className="text-center", style={'color': 'rgba(255, 255, 255, 0.6)'})
                 ]),
                 width=12
             )

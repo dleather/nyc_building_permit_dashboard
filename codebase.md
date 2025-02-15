@@ -179,7 +179,8 @@ from src.data_utils import (
     global_agg_99,
     global_quarterly_99,
     build_two_trace_mapbox,
-    get_subrange_singlequarter_99
+    get_subrange_singlequarter_99,
+    get_global_max_for_permit_type
 )
 
 import numpy as np
@@ -333,60 +334,55 @@ from src.data_utils import ensure_all_hexes, global_quarterly_99, all_hexes
     Input("map_view_store", "data")
 )
 def update_quarterly_map(global_filter, map_view):
-    permit_type  = global_filter.get("permitType", "NB")
-    current_idx  = global_filter.get("currentQuarterIndex", 0)
-    start_idx    = global_filter["startQuarterIndex"]
-    end_idx      = global_filter["endQuarterIndex"]
-    selected_hex = global_filter["selectedHexes"]
+    permit_type = global_filter.get("permitType", "NB")
+    current_idx = global_filter.get("currentQuarterIndex", 0)
+    start_idx = global_filter["startQuarterIndex"]
+    end_idx = global_filter["endQuarterIndex"]
+    selected_hex = global_filter.get("selectedHexes", [])  # Get selected hexes with empty list default
     
-    logger.info("update_quarterly_map triggered")
-    logger.info("global_filter.selectedHexes: %s", selected_hex)
-    
-    start_label = quarters[start_idx]
     quarter_label = quarters[current_idx]
-    end_label   = quarters[end_idx]
     
-    df_sub_seln = permit_counts_wide.loc[
-        (permit_counts_wide["period"] >= start_label) &
-        (permit_counts_wide["period"] <= end_label) &
-        (permit_counts_wide["h3_index"].isin(selected_hex))
-    ]
-    
-    df_current = permit_counts_wide.loc[
+    # Get all data for the current quarter (this will be our base layer)
+    df_base = permit_counts_wide.loc[
         permit_counts_wide["period"] == quarter_label
     ].copy()
+
+    # For the top layer, create a new DataFrame that only includes selected hexes
+    if global_filter.get("resetMaps", False):
+        df_top = df_base.copy()  # Show everything if reset is True
+    elif not selected_hex:
+        df_top = pd.DataFrame(columns=df_base.columns)  # Empty DataFrame if no selection
+    else:
+        df_top = df_base[df_base["h3_index"].isin(selected_hex)].copy()  # Only selected hexes
     
-    if df_current.empty:
-        return px.choropleth_mapbox()
+    # Use the global maximum for the base layer
+    start_label = quarters[start_idx]
+    end_label = quarters[end_idx]
+    global_max = get_subrange_singlequarter_99(permit_type, start_label, end_label)
+    use_log = global_max > 100  # Or use should_use_log_scale() with full range data
     
-    #df_current = ensure_all_hexes(df_current, permit_type)
-    subrange_99 = get_subrange_singlequarter_99(permit_type, start_label, end_label)
+    # Debug output
+    #logger.info(f"Current quarter: {quarter_label}")
+    #logger.info(f"Selected hexes: {len(selected_hex)}")
+    #logger.info(f"Permit type: {permit_type}")
+    #logger.info(f"Global max: {global_max}")
+    #logger.info(f"df_current shape: {df_current.shape}")
+    #logger.info(f"df_sub_seln shape: {df_sub_seln.shape}")
     
     cmin_base = 0
-    cmax_base = subrange_99
-    
-    if global_filter.get("resetMaps", False):
-        df_top = df_current.copy()
-    elif not selected_hex:
-        df_top = df_current.copy()
-    else:
-        df_top = df_current[df_current["h3_index"].isin(selected_hex)]
-    logger.info("df_top length: %s", len(df_top))
-    #df_top = ensure_all_hexes(df_top, permit_type)
-    #logger.info("df_top length: %s", len(df_top))
-
-    cmin_top = 0
-    cmax_top = df_sub_seln[permit_type].max() if not df_sub_seln.empty else subrange_99
+    cmax_base = global_max
     
     fig = build_two_trace_mapbox(
-        df_base=df_current,
+        df_base=df_base,
         df_top=df_top,
         permit_type=permit_type,
         cmin_base=cmin_base,
         cmax_base=cmax_base,
-        cmin_top=cmin_top,
-        cmax_top=cmax_top,
-        map_title="Quarterly View"
+        cmin_top=0,
+        cmax_top=global_max,
+        map_title="Quarterly View",
+        use_log_base=use_log,
+        use_log_top=use_log
     )
     
     # If map_view is not defined, fallback to default view settings
@@ -426,11 +422,11 @@ def update_aggregated_map(global_filter, map_view):
     end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
     selected_hex = global_filter.get("selectedHexes", [])
     reset_maps = global_filter.get("resetMaps", False)  # Check for reset flag
-    logger.info("update_aggregated_map triggered")
-    logger.info("global_filter.selectedHexes: %s", selected_hex)
-    logger.info("reset_maps: %s", reset_maps)
-    logger.info("start_idx: %s", start_idx)
-    logger.info("end_idx: %s", end_idx)
+    #logger.info("update_aggregated_map triggered")
+    #logger.info("global_filter.selectedHexes: %s", selected_hex)
+    #logger.info("reset_maps: %s", reset_maps)
+    #logger.info("start_idx: %s", start_idx)
+    #logger.info("end_idx: %s", end_idx)
 
     start_label = quarters[start_idx]
     end_label   = quarters[end_idx]
@@ -440,7 +436,7 @@ def update_aggregated_map(global_filter, map_view):
         (permit_counts_wide["period"] >= start_label) &
         (permit_counts_wide["period"] <= end_label)
     ].copy()
-    logger.info("df_sub length: %s", len(df_sub))
+    
     if df_sub.empty:
         return px.choropleth_mapbox()
     
@@ -449,14 +445,16 @@ def update_aggregated_map(global_filter, map_view):
     
     cmin_base = 0
     cmax_base = global_agg_99[permit_type]
+    use_log = global_agg_99[permit_type] > 100
     
     # 2) Determine the top layer based on hex selections or reset flag.
-    logger.info("reset_maps: %s", reset_maps)
-    logger.info("selected_hex: %s", selected_hex)
+    #logger.info("reset_maps: %s", reset_maps)
+    #logger.info("selected_hex: %s", selected_hex)
+    # For the top layer, create a new DataFrame that only includes selected hexes
     if global_filter.get("resetMaps", False):
-        df_top = df_agg.copy()
+        df_top = df_agg.copy()  # Show all hexes in top layer
     elif not selected_hex:
-        df_top = df_agg.copy()
+        df_top = df_agg.copy() # Empty when no selection
     else:
         df_top = df_agg[df_agg["h3_index"].isin(selected_hex)]
     logger.info("df_top length: %s", len(df_top))
@@ -472,7 +470,9 @@ def update_aggregated_map(global_filter, map_view):
         cmax_base=cmax_base,
         cmin_top=cmin_top,
         cmax_top=cmax_top,
-        map_title="Aggregated View"
+        map_title="Aggregated View",
+        use_log_base=use_log,
+        use_log_top=use_log
     )
     
     # 4) Apply stored view settings and return the figure
@@ -637,11 +637,10 @@ def update_time_series(global_filter):
     ],
     [
         State("global_filter", "data"),
-        State("add-to-selection-toggle", "value")
     ],
     prevent_initial_call=True
 )
-def update_selected_hexes(qtr_sel, agg_sel, clear_n_clicks, global_filter, selection_mode="no"):
+def update_selected_hexes(qtr_sel, agg_sel, clear_n_clicks, global_filter):
     ctx = dash.callback_context
     if not ctx.triggered:
         return global_filter
@@ -666,7 +665,20 @@ def update_selected_hexes(qtr_sel, agg_sel, clear_n_clicks, global_filter, selec
     new_filter["selectedHexes"] = list(new_sel)
     
     return new_filter
-
+@app.callback(
+    Output("global_filter", "data", allow_duplicate=True),
+    Input("map-aggregated", "figure"),
+    Input("map-quarterly", "figure"),
+    State("global_filter", "data"),
+    prevent_initial_call=True
+)
+def clear_reset_flag(_, __, global_filter):
+    """Resets the resetMaps flag after maps have updated"""
+    if global_filter.get("resetMaps", False):
+        new_filter = dict(global_filter)
+        new_filter["resetMaps"] = False
+        return new_filter
+    return dash.no_update
 @app.callback(
     [Output("map-quarterly-title", "children"),
      Output("map-aggregated-title", "children"),
@@ -789,33 +801,33 @@ import math
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-logger.info("=== Starting data_utils.py ===")
-logger.info(f"Current working directory: {os.getcwd()}")
-logger.info(f"PROCESSED_DATA_PATH: {PROCESSED_DATA_PATH}")
-logger.info(f"Does data path exist? {os.path.exists(PROCESSED_DATA_PATH)}")
+##logger.info("=== Starting data_utils.py ===")
+##logger.info(f"Current working directory: {os.getcwd()}")
+##logger.info(f"PROCESSED_DATA_PATH: {PROCESSED_DATA_PATH}")
+##logger.info(f"Does data path exist? {os.path.exists(PROCESSED_DATA_PATH)}")
 
 # Check for specific files
 hex_file = f"{PROCESSED_DATA_PATH}/nyc_hexes.geojson"
 permits_file = f"{PROCESSED_DATA_PATH}/permits_wide.csv"
 
-logger.info(f"Does {hex_file} exist? {os.path.exists(hex_file)}")
-logger.info(f"Does {permits_file} exist? {os.path.exists(permits_file)}")
+#logger.info(f"Does {hex_file} exist? {os.path.exists(hex_file)}")
+#logger.info(f"Does {permits_file} exist? {os.path.exists(permits_file)}")
 
 # Load hex data and do necessary type conversions:
 hex_gdf = gpd.read_file(f"{PROCESSED_DATA_PATH}/nyc_hexes.geojson")
 hex_gdf['h3_index'] = hex_gdf['h3_index'].astype(str)
 hex_geojson = json.loads(hex_gdf.to_json())
 
-logger.info(f"Loaded hex_gdf with shape: {hex_gdf.shape}")
-logger.info(f"Sample h3_index values: {hex_gdf['h3_index'].head().tolist()}")
+#logger.info(f"Loaded hex_gdf with shape: {hex_gdf.shape}")
+#logger.info(f"Sample h3_index values: {hex_gdf['h3_index'].head().tolist()}")
 
 # Load permits data:
 permit_counts_path = Path(f"{PROCESSED_DATA_PATH}/permits_wide.csv")
 permit_counts_wide = pd.read_csv(permit_counts_path)
 
-logger.info(f"Loaded permit_counts_wide with shape: {permit_counts_wide.shape}")
-logger.info(f"Available columns: {permit_counts_wide.columns.tolist()}")
-logger.info(f"Sample periods: {permit_counts_wide['period'].unique()[:5].tolist()}")
+#logger.info(f"Loaded permit_counts_wide with shape: {permit_counts_wide.shape}")
+#logger.info(f"Available columns: {permit_counts_wide.columns.tolist()}")
+#logger.info(f"Sample periods: {permit_counts_wide['period'].unique()[:5].tolist()}")
 
 # Compute quarters & mapping:
 quarters = sorted(permit_counts_wide['period'].unique())
@@ -936,6 +948,46 @@ def build_log_ticks(new_cmax):
     tick_text = [f"{int(10**v) if v.is_integer() else 10**v:.0f}" for v in tick_vals]
     return tick_vals, tick_text
 
+def should_use_log_scale(values, threshold=100):
+    """
+    Determine if a log scale would be appropriate based on data distribution.
+    Returns True if the 99th percentile of the data is greater than 100.
+    """
+    non_zero = values[values > 0]
+    if len(non_zero) < 2:  # Need at least 2 points for meaningful comparison
+        return False
+        
+    # Calculate 99th percentile
+    p99 = np.percentile(non_zero, 99)
+    return p99 > 100
+
+def get_colorscale_params(values, use_log=False):
+    """
+    Get appropriate colorscale parameters based on the data and scale type.
+    Returns tuple of (zmin, zmax, colorscale_name, colorbar_title_suffix)
+    """
+    # Create custom colorscale that goes from light blue to red
+    custom_colorscale = [
+        [0, 'rgb(220,235,255)'],     # Very light blue for bottom 5%
+        [0.05, 'rgb(255,235,235)'],  # Very light red at 5%
+        [0.2, 'rgb(255,200,200)'],   # Lighter red
+        [0.4, 'rgb(255,150,150)'],   # Light red
+        [0.6, 'rgb(255,100,100)'],   # Medium red
+        [0.8, 'rgb(255,50,50)'],     # Darker red
+        [1, 'rgb(200,0,0)']          # Darkest red
+    ]
+    
+    if use_log:
+        non_zero = values[values > 0]
+        if len(non_zero) == 0:
+            return 0, 1, custom_colorscale, " (log scale)"
+            
+        zmin = max(0.1, non_zero.min())  # Avoid log(0)
+        zmax = non_zero.max()
+        return zmin, zmax, custom_colorscale, " (log scale)"
+    else:
+        return values.min(), values.max(), custom_colorscale, ""
+
 def build_two_trace_mapbox(
     df_base,
     df_top,
@@ -944,54 +996,92 @@ def build_two_trace_mapbox(
     cmax_base,
     cmin_top,
     cmax_top,
-    selecting=False,    # <--- new param
+    selecting=False,
     show_all_if_empty=True,
-    map_title=""
+    map_title="",
+    use_log_base=False,
+    use_log_top=False
 ):
     import plotly.graph_objects as go
     
-    # We want to ensure zero is still shown as a faint color.
-    # So we do not rely on marker_opacity=0 for zero values.
-    # Instead, let all polygons get some color in 'Reds'.
+    # Use provided log scale parameters
+    base_values = df_base[permit_type]
+    top_values = df_top[permit_type]
+    #logger.info(f"base_values min, max: {base_values.min()}, {base_values.max()}")
+    #logger.info(f"top_values min, max: {top_values.min()}, {top_values.max()}")
+    
+    #logger.info(f"Using log base: {use_log_base} (provided)")
+    #logger.info(f"Using log top: {use_log_top} (provided)")
+    
+    # Determine if we should use the same color scale for both layers
+    use_same_scale = df_base.equals(df_top)
+    
+    # Get colorscale parameters for base layer
+    if use_log_base:
+        zmin_base, zmax_base, cs_base, suffix_base = get_colorscale_params(base_values, True)
+    else:
+        # Use provided linear scale bounds
+        zmin_base, zmax_base = cmin_base, cmax_base
+        cs_base = get_colorscale_params(base_values, False)[2]  # Just get colorscale
+        suffix_base = ""
+    
+    # Base trace with potential log scale
     base_trace = go.Choroplethmapbox(
         geojson=hex_geojson,
         featureidkey="properties.h3_index",
         locations=df_base["h3_index"],
         z=df_base[permit_type],
-        zmin=0,
-        zmax=cmax_base,               # from 0 up to the 99th percentile
-        colorscale="Reds",
-        # Instead of 0.2, let's use 0.8 so zeros appear faint pink but not transparent
-        marker_opacity=0.8,
-        marker_line_width=0.3,
-        marker_line_color="#999",
+        zmin=zmin_base,
+        zmax=zmax_base,
+        colorscale=cs_base,
+        marker_opacity=0.75,
+        marker_line_width=0.1,
+        marker_line_color='#666',
         showscale=False,
         hoverinfo="skip",
         name="Base"
     )
     
-    # Decide what to draw for top trace
-    #if selecting:
-        # If user is actively dragging a selection, hide the top layer
-    #    top_opacity = 0
-    #else:
-        # If not selecting, either highlight all hexes (when selectedHexes is empty)
-        # or highlight only selected hexes    
+    if use_log_base:
+        base_trace.update(
+            colorbar_title=f"Count{suffix_base}",
+            colorbar_tickformat=".1e"
+        )
+        
+    # Get colorscale parameters for top layer
+    if use_same_scale:
+        # Use the same parameters as the base layer
+        zmin_top, zmax_top = zmin_base, zmax_base
+        cs_top = cs_base
+        suffix_top = suffix_base
+    elif use_log_top:
+        zmin_top, zmax_top, cs_top, suffix_top = get_colorscale_params(top_values, True)
+    else:
+        # Use provided linear scale bounds
+        zmin_top, zmax_top = cmin_top, cmax_top
+        cs_top = get_colorscale_params(top_values, False)[2]  # Just get colorscale
+        suffix_top = ""
+    
+    # Top trace with potential log scale
     top_trace = go.Choroplethmapbox(
         geojson=hex_geojson,
         featureidkey="properties.h3_index",
         locations=df_top["h3_index"],
         z=df_top[permit_type],
-        zmin=0,
-        zmax=cmax_top,
-        colorscale="Reds",
-        marker_opacity=0.9,
-        marker_line_width=1.0,
-        marker_line_color="#333",
+        zmin=zmin_top,
+        zmax=zmax_top,
+        colorscale=cs_top,
+        marker_opacity=0.99,
+        marker_line_width=2.5,
+        marker_line_color='#666',
         showscale=True,
         name="Selected",
-        hoverinfo="location+z"
+        hoverinfo="location+z",
+        colorbar_title=f"Count{suffix_top}"
     )
+    
+    if use_log_top:
+        top_trace.update(colorbar_tickformat=".1e")
 
     fig = go.Figure([base_trace, top_trace])
     fig.update_layout(
@@ -1007,7 +1097,27 @@ def build_two_trace_mapbox(
     )
     return fig
 
-
+def get_global_max_for_permit_type(permit_type, start_idx=None, end_idx=None):
+    """
+    Returns the maximum value for a permit type across hex_index × period combinations
+    within the specified time range.
+    
+    Args:
+        permit_type: The type of permit to get max value for
+        start_idx: Starting quarter index (optional)
+        end_idx: Ending quarter index (optional)
+    """
+    if start_idx is None or end_idx is None:
+        return permit_counts_wide[permit_type].max()
+        
+    start_label = quarters[start_idx]
+    end_label = quarters[end_idx]
+    
+    return permit_counts_wide.loc[
+        (permit_counts_wide["period"] >= start_label) &
+        (permit_counts_wide["period"] <= end_label),
+        permit_type
+    ].max()
 
 # Expose these variables for use in callbacks and layout:
 __all__ = [
@@ -1125,16 +1235,6 @@ layout = dbc.Container(
                             ),
                         ], className="mb-3"),
                     ]),
-                    # Add to selection toggle
-                    dcc.RadioItems(
-                        id="add-to-selection-toggle",
-                        options=[
-                            {"label": "Add to selection (union)", "value": "yes"},
-                            {"label": "Replace selection (overwrite)", "value": "no"}
-                        ],
-                        value="yes",  # default value
-                        labelStyle={"display": "inline-block", "margin-right": "10px"}
-                    ),
                     # Play/Pause/Clear Buttons
                     html.Div([
                         html.Button("▶️ Play", id='play-button', n_clicks=0,
