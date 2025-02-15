@@ -166,7 +166,8 @@ layout = dbc.Container(
                 "permitType": "NB",
                 "play": False,
                 "speed": 1000,
-                "selectedHexes": []
+                "selectedHexes": [],
+                "resetMaps": False
             }
         ),
         dcc.Interval(

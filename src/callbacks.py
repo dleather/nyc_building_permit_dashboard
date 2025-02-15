@@ -173,7 +173,7 @@ from src.data_utils import ensure_all_hexes, global_quarterly_99, all_hexes
 @app.callback(
     Output("map-quarterly", "figure"),
     Input("global_filter", "data"),
-    Input("map_view_store", "data")  # new input for map view
+    Input("map_view_store", "data")
 )
 def update_quarterly_map(global_filter, map_view):
     permit_type  = global_filter.get("permitType", "NB")
@@ -181,6 +181,9 @@ def update_quarterly_map(global_filter, map_view):
     start_idx    = global_filter["startQuarterIndex"]
     end_idx      = global_filter["endQuarterIndex"]
     selected_hex = global_filter["selectedHexes"]
+    
+    logger.info("update_quarterly_map triggered")
+    logger.info("global_filter.selectedHexes: %s", selected_hex)
     
     start_label = quarters[start_idx]
     quarter_label = quarters[current_idx]
@@ -199,16 +202,22 @@ def update_quarterly_map(global_filter, map_view):
     if df_current.empty:
         return px.choropleth_mapbox()
     
-    df_current = ensure_all_hexes(df_current, permit_type)
+    #df_current = ensure_all_hexes(df_current, permit_type)
     subrange_99 = get_subrange_singlequarter_99(permit_type, start_label, end_label)
     
     cmin_base = 0
     cmax_base = subrange_99
     
-    df_top = df_current[df_current["h3_index"].isin(selected_hex)]
-    
-    df_top = ensure_all_hexes(df_top, permit_type)
-    
+    if global_filter.get("resetMaps", False):
+        df_top = df_current.copy()
+    elif not selected_hex:
+        df_top = df_current.copy()
+    else:
+        df_top = df_current[df_current["h3_index"].isin(selected_hex)]
+    logger.info("df_top length: %s", len(df_top))
+    #df_top = ensure_all_hexes(df_top, permit_type)
+    #logger.info("df_top length: %s", len(df_top))
+
     cmin_top = 0
     cmax_top = df_sub_seln[permit_type].max() if not df_sub_seln.empty else subrange_99
     
@@ -252,50 +261,52 @@ def update_quarterly_map(global_filter, map_view):
 @app.callback(
     Output("map-aggregated", "figure"),
     Input("global_filter", "data"),
-    Input("map_view_store", "data"),
-    Input("map-aggregated", "relayoutData"),
-    State("map_view_store", "data"),
-    prevent_initial_call=True
+    Input("map_view_store", "data")
 )
-def update_aggregated_map(global_filter, map_view, relayout, current_view):
-    permit_type  = global_filter.get("permitType", "NB")
-    start_idx    = global_filter.get("startQuarterIndex", 0)
-    end_idx      = global_filter.get("endQuarterIndex", len(quarters) - 1)
-    current_idx  = global_filter.get("currentQuarterIndex", 0)
+def update_aggregated_map(global_filter, map_view):
+    permit_type = global_filter.get("permitType", "NB")
+    start_idx = global_filter.get("startQuarterIndex", 0)
+    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
     selected_hex = global_filter.get("selectedHexes", [])
-    
-    # 1) Figure out if the user is dragging (selecting)
-    selecting = False
-    if relayout and "mapbox._dragging" in relayout and relayout["mapbox._dragging"]:
-        selecting = True
+    reset_maps = global_filter.get("resetMaps", False)  # Check for reset flag
+    logger.info("update_aggregated_map triggered")
+    logger.info("global_filter.selectedHexes: %s", selected_hex)
+    logger.info("reset_maps: %s", reset_maps)
+    logger.info("start_idx: %s", start_idx)
+    logger.info("end_idx: %s", end_idx)
 
     start_label = quarters[start_idx]
     end_label   = quarters[end_idx]
     
-    # 2) Build the base DataFrame (aggregating over the selected time range)
+    # 1) Build the base DataFrame (aggregating over the selected time range)
     df_sub = permit_counts_wide.loc[
         (permit_counts_wide["period"] >= start_label) &
         (permit_counts_wide["period"] <= end_label)
     ].copy()
+    logger.info("df_sub length: %s", len(df_sub))
     if df_sub.empty:
         return px.choropleth_mapbox()
     
     df_agg = df_sub.groupby("h3_index", as_index=False)[permit_type].sum()
-    df_agg = ensure_all_hexes(df_agg, permit_type)
+    #df_agg = ensure_all_hexes(df_agg, permit_type)
     
     cmin_base = 0
     cmax_base = global_agg_99[permit_type]
     
-    # If no hexes are selected, show the full dataset in the top layer
-    if not selected_hex:
+    # 2) Determine the top layer based on hex selections or reset flag.
+    logger.info("reset_maps: %s", reset_maps)
+    logger.info("selected_hex: %s", selected_hex)
+    if global_filter.get("resetMaps", False):
+        df_top = df_agg.copy()
+    elif not selected_hex:
         df_top = df_agg.copy()
     else:
         df_top = df_agg[df_agg["h3_index"].isin(selected_hex)]
+    logger.info("df_top length: %s", len(df_top))
     
+    # 3) Build the figure using our helper function
     cmin_top = 0
     cmax_top = df_top[permit_type].max() if not df_top.empty else 0
-    
-    # 3) Pass the 'selecting' flag to our figure builder
     fig = build_two_trace_mapbox(
         df_base=df_agg,
         df_top=df_top,
@@ -304,8 +315,7 @@ def update_aggregated_map(global_filter, map_view, relayout, current_view):
         cmax_base=cmax_base,
         cmin_top=cmin_top,
         cmax_top=cmax_top,
-        map_title="Aggregated View",
-        selecting=selecting
+        map_title="Aggregated View"
     )
     
     # 4) Apply stored view settings and return the figure
@@ -463,53 +473,42 @@ def update_time_series(global_filter):
 # ------------------------------------------------------------------------------
 @app.callback(
     Output("global_filter", "data", allow_duplicate=True),
-    [Input("map-quarterly", "selectedData"),
-     Input("map-aggregated", "selectedData"),
-     Input("add-to-selection-toggle", "value")],
-    State("global_filter", "data"),
+    [
+        Input("map-quarterly", "selectedData"),
+        Input("map-aggregated", "selectedData"),
+        Input("clear-hexes", "n_clicks")
+    ],
+    [
+        State("global_filter", "data"),
+        State("add-to-selection-toggle", "value")
+    ],
     prevent_initial_call=True
 )
-def update_selected_hexes(qtr_sel, agg_sel, add_mode, global_filter):
+def update_selected_hexes(qtr_sel, agg_sel, clear_n_clicks, global_filter, selection_mode="no"):
     ctx = dash.callback_context
-    if not ctx.triggered:  # no selection event
+    if not ctx.triggered:
         return global_filter
 
-    # Which input actually triggered this callback?
-    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    # Create a new copy of global_filter to modify
+    new_filter = dict(global_filter)
+    
+    # Clear any previous resetMaps flag
+    new_filter["resetMaps"] = False
+    
+    if trigger_id == "clear-hexes":
+        new_filter["selectedHexes"] = []
+        new_filter["resetMaps"] = True
+        return new_filter
 
-    # Convert old selection to a set
-    old_sel = set(global_filter.get("selectedHexes", []))
-
-    # Depending on which map changed, get that set of new hexes
-    new_sel = set()
-    if trigger_id == "map-quarterly":
-        new_sel = set(p["location"] for p in (qtr_sel or {}).get("points", []))
-    elif trigger_id == "map-aggregated":
-        new_sel = set(p["location"] for p in (agg_sel or {}).get("points", []))
-
-    # Now decide if we union or overwrite
-    if add_mode == "yes":
-        # Union
-        global_filter["selectedHexes"] = list(old_sel | new_sel)
-    else:
-        # Overwrite with just the new selection
-        global_filter["selectedHexes"] = list(new_sel)
-
-    return global_filter
-
-# ------------------------------------------------------------------------------
-# 11) Clear Button -> Clear the selected hexes
-# ------------------------------------------------------------------------------
-@app.callback(
-    Output("global_filter", "data", allow_duplicate=True),
-    Input("clear-hexes", "n_clicks"),
-    State("global_filter", "data"),
-    prevent_initial_call=True
-)
-def clear_hex_selection(n_clicks, global_filter):
-    if n_clicks:
-        global_filter["selectedHexes"] = []
-    return global_filter
+    # Handle new selections
+    selected_data = qtr_sel if trigger_id == "map-quarterly" else agg_sel
+    new_points = (selected_data or {}).get("points", [])
+    new_sel = set(p["location"] for p in new_points)
+    new_filter["selectedHexes"] = list(new_sel)
+    
+    return new_filter
 
 @app.callback(
     [Output("map-quarterly-title", "children"),

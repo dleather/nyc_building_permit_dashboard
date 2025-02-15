@@ -197,14 +197,12 @@ def build_two_trace_mapbox(
     )
     
     # Decide what to draw for top trace
-    if selecting:
+    #if selecting:
         # If user is actively dragging a selection, hide the top layer
-        top_opacity = 0
-    else:
+    #    top_opacity = 0
+    #else:
         # If not selecting, either highlight all hexes (when selectedHexes is empty)
-        # or highlight only selected hexes
-        top_opacity = 0.85
-    
+        # or highlight only selected hexes    
     top_trace = go.Choroplethmapbox(
         geojson=hex_geojson,
         featureidkey="properties.h3_index",
@@ -213,7 +211,7 @@ def build_two_trace_mapbox(
         zmin=0,
         zmax=cmax_top,
         colorscale="Reds",
-        marker_opacity=top_opacity,
+        marker_opacity=0.9,
         marker_line_width=1.0,
         marker_line_color="#333",
         showscale=True,
