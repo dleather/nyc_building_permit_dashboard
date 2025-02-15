@@ -170,104 +170,71 @@ def build_two_trace_mapbox(
     cmax_base,
     cmin_top,
     cmax_top,
-    current_idx=None,
-    map_title=None
+    selecting=False,    # <--- new param
+    show_all_if_empty=True,
+    map_title=""
 ):
     import plotly.graph_objects as go
-    import numpy as np
-
-    # Make sure to fillna(0) or ensure data is present
-    df_base = df_base.copy()
-    df_base[permit_type] = df_base[permit_type].fillna(0)
-
-    df_top = df_top.copy()
-    df_top[permit_type] = df_top[permit_type].fillna(0)
-
-    # Decide log-scaling for base layer
-    use_log_base = (cmax_base > 20)
-    if use_log_base:
-        df_base["display_value"] = np.log10(df_base[permit_type] + 1.0)
-        new_cmin_base = 0
-        new_cmax_base = np.log10(cmax_base + 1.0)
-    else:
-        df_base["display_value"] = df_base[permit_type]
-        new_cmin_base = cmin_base
-        new_cmax_base = cmax_base
-
-    # Decide log-scaling for top layer
-    use_log_top = (cmax_top > 20)
-    if use_log_top:
-        df_top["display_value"] = np.log10(df_top[permit_type] + 1.0)
-        new_cmin_top = 0
-        new_cmax_top = np.log10(cmax_top + 1.0)
-    else:
-        df_top["display_value"] = df_top[permit_type]
-        new_cmin_top = cmin_top
-        new_cmax_top = cmax_top
-
-    # Base trace
+    
+    # We want to ensure zero is still shown as a faint color.
+    # So we do not rely on marker_opacity=0 for zero values.
+    # Instead, let all polygons get some color in 'Reds'.
     base_trace = go.Choroplethmapbox(
         geojson=hex_geojson,
         featureidkey="properties.h3_index",
         locations=df_base["h3_index"],
-        z=df_base["display_value"],
-        zmin=new_cmin_base,
-        zmax=new_cmax_base,
+        z=df_base[permit_type],
+        zmin=0,
+        zmax=cmax_base,               # from 0 up to the 99th percentile
         colorscale="Reds",
+        # Instead of 0.2, let's use 0.8 so zeros appear faint pink but not transparent
+        marker_opacity=0.8,
         marker_line_width=0.3,
         marker_line_color="#999",
-        marker_opacity=0.4,    # faint
-        showscale=False,       # hide base colorbar
+        showscale=False,
         hoverinfo="skip",
-        name="Base (faint)"
+        name="Base"
     )
-
-    # Build colorbar for top trace
-    if use_log_top:
-        tick_vals, tick_text = build_log_ticks(new_cmax_top)
-        colorbar_props = dict(
-            tickmode="array",
-            tickvals=tick_vals,
-            ticktext=tick_text,
-            title=f"Permits\nIssued"
-        )
+    
+    # Decide what to draw for top trace
+    if selecting:
+        # If user is actively dragging a selection, hide the top layer
+        top_opacity = 0
     else:
-        colorbar_props = dict(title="")
-
-    # Top trace (only subset)
+        # If not selecting, either highlight all hexes (when selectedHexes is empty)
+        # or highlight only selected hexes
+        top_opacity = 0.85
+    
     top_trace = go.Choroplethmapbox(
         geojson=hex_geojson,
         featureidkey="properties.h3_index",
         locations=df_top["h3_index"],
-        z=df_top["display_value"],
-        zmin=new_cmin_top,
-        zmax=new_cmax_top,
+        z=df_top[permit_type],
+        zmin=0,
+        zmax=cmax_top,
         colorscale="Reds",
+        marker_opacity=top_opacity,
         marker_line_width=1.0,
         marker_line_color="#333",
-        marker_opacity=0.9,     # highlight
-        showscale=True,         # show top colorbar only
-        colorbar=colorbar_props,
-        hoverinfo="location+z",
-        name="Selected"
+        showscale=True,
+        name="Selected",
+        hoverinfo="location+z"
     )
 
     fig = go.Figure([base_trace, top_trace])
     fig.update_layout(
+        title=dict(text=map_title, x=0.5),
         mapbox=dict(
             style="carto-positron",
             center={"lat": 40.7, "lon": -73.9},
             zoom=9
         ),
         margin=dict(r=0, t=30, l=0, b=0),
-        title=dict(
-            text=map_title if map_title else "",
-            x=0.5
-        ),
         dragmode="select",
         uirevision="constant"
     )
     return fig
+
 
 
 # Expose these variables for use in callbacks and layout:

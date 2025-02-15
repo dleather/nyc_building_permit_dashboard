@@ -337,51 +337,38 @@ def update_quarterly_map(global_filter, map_view):
     current_idx  = global_filter.get("currentQuarterIndex", 0)
     start_idx    = global_filter["startQuarterIndex"]
     end_idx      = global_filter["endQuarterIndex"]
-    selected_hex = global_filter["selectedHexes"] or []  # might be empty
-    permit_type  = global_filter.get("permitType", "NB")
-
-    # Convert indices to actual quarter labels
+    selected_hex = global_filter["selectedHexes"]
+    
     start_label = quarters[start_idx]
     quarter_label = quarters[current_idx]
     end_label   = quarters[end_idx]
-
-    # 1) Filter to the chosen subrange AND chosen hexes
+    
     df_sub_seln = permit_counts_wide.loc[
         (permit_counts_wide["period"] >= start_label) &
         (permit_counts_wide["period"] <= end_label) &
         (permit_counts_wide["h3_index"].isin(selected_hex))
     ]
-
-    # 2) Filter the data to *this quarter* only
+    
     df_current = permit_counts_wide.loc[
         permit_counts_wide["period"] == quarter_label
     ].copy()
     
     if df_current.empty:
         return px.choropleth_mapbox()
-
-    # Ensure all hexes are present:
+    
     df_current = ensure_all_hexes(df_current, permit_type)
-
     subrange_99 = get_subrange_singlequarter_99(permit_type, start_label, end_label)
-
-    # Decide cmin/cmax for base and top traces
+    
     cmin_base = 0
     cmax_base = subrange_99
-
-    if not selected_hex:
-        selected_hex = df_current["h3_index"].tolist()
-
+    
     df_top = df_current[df_current["h3_index"].isin(selected_hex)]
-    if df_top.empty:
-        df_top = df_current.copy()
-
+    
+    df_top = ensure_all_hexes(df_top, permit_type)
+    
     cmin_top = 0
-    if df_sub_seln.empty:
-        cmax_top = subrange_99
-    else:
-        cmax_top = df_sub_seln[permit_type].max()
-
+    cmax_top = df_sub_seln[permit_type].max() if not df_sub_seln.empty else subrange_99
+    
     fig = build_two_trace_mapbox(
         df_base=df_current,
         df_top=df_top,
@@ -435,30 +422,25 @@ def update_aggregated_map(global_filter, map_view):
     start_label = quarters[start_idx]
     end_label   = quarters[end_idx]
     
-    # 1) Build the "base" DF as usual: sum over subrange, fill missing with 0
+    # Build the base DataFrame (aggregating over the selected time range)
     df_sub = permit_counts_wide.loc[
         (permit_counts_wide["period"] >= start_label) &
         (permit_counts_wide["period"] <= end_label)
     ].copy()
     if df_sub.empty:
         return px.choropleth_mapbox()
-
+    
     df_agg = df_sub.groupby("h3_index", as_index=False)[permit_type].sum()
     df_agg = ensure_all_hexes(df_agg, permit_type)
-
+    
     cmin_base = 0
     cmax_base = global_agg_99[permit_type]
-
-    if not selected_hex:
-        selected_hex = df_agg["h3_index"].tolist()
     
     df_top = df_agg[df_agg["h3_index"].isin(selected_hex)]
-    if df_top.empty:
-        df_top = df_agg.copy()
-
+    
     cmin_top = 0
-    cmax_top = df_top[permit_type].max()
-
+    cmax_top = df_top[permit_type].max() if not df_top.empty else 0
+    
     fig = build_two_trace_mapbox(
         df_base=df_agg,
         df_top=df_top,
@@ -626,53 +608,38 @@ def update_time_series(global_filter):
 # ------------------------------------------------------------------------------
 @app.callback(
     Output("global_filter", "data", allow_duplicate=True),
-    Input("map-quarterly", "selectedData"),
-    Input("map-aggregated", "selectedData"),
+    [Input("map-quarterly", "selectedData"),
+     Input("map-aggregated", "selectedData"),
+     Input("add-to-selection-toggle", "value")],
     State("global_filter", "data"),
     prevent_initial_call=True
 )
-def update_selected_hexes(quarterly_sel, aggregated_sel, global_filter):
-    """
-    Whenever user selects hexes on EITHER map, unify that selection.
-    We store them in global_filter["selectedHexes"].
-    """
+def update_selected_hexes(qtr_sel, agg_sel, add_mode, global_filter):
     ctx = dash.callback_context
-
-    # Which input triggered the callback?
-    if not ctx.triggered or (quarterly_sel is None and aggregated_sel is None):
+    if not ctx.triggered:  # no selection event
         return global_filter
 
-    # Helper to extract h3 indices from the 'selectedData'
-    def extract_hexes(selectedData):
-        """
-        'selectedData' is typically a dict with structure:
-            {
-                "points": [
-                    {"location": "h3_index_string", ...},
-                    {"location": "h3_index_string", ...},
-                    ...
-                ]
-            }
-        We want to return a list of those location values.
-        """
-        if not selectedData or "points" not in selectedData:
-            return []
-        return [p["location"] for p in selectedData["points"] if "location" in p]
+    # Which input actually triggered this callback?
+    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-    # Extract from whichever map triggered
-    q_hexes = extract_hexes(quarterly_sel)
-    a_hexes = extract_hexes(aggregated_sel)
+    # Convert old selection to a set
+    old_sel = set(global_filter.get("selectedHexes", []))
 
-    # Here you can decide on how to combine them:
-    # Option A: Overwrite the selection with the most recently used map
-    # Option B: Union them
-    # For simplicity, let's assume we want to unify them:
-    newly_selected = set(q_hexes) | set(a_hexes)
+    # Depending on which map changed, get that set of new hexes
+    new_sel = set()
+    if trigger_id == "map-quarterly":
+        new_sel = set(p["location"] for p in (qtr_sel or {}).get("points", []))
+    elif trigger_id == "map-aggregated":
+        new_sel = set(p["location"] for p in (agg_sel or {}).get("points", []))
 
-    # If you prefer to *only* keep the last map's selection, do:
-    # newly_selected = set(q_hexes if q_hexes else a_hexes)
+    # Now decide if we union or overwrite
+    if add_mode == "yes":
+        # Union
+        global_filter["selectedHexes"] = list(old_sel | new_sel)
+    else:
+        # Overwrite with just the new selection
+        global_filter["selectedHexes"] = list(new_sel)
 
-    global_filter["selectedHexes"] = list(newly_selected)
     return global_filter
 
 # ------------------------------------------------------------------------------
@@ -1012,7 +979,7 @@ def build_two_trace_mapbox(
         colorscale="Reds",
         marker_line_width=0.3,
         marker_line_color="#999",
-        marker_opacity=0.4,    # faint
+        marker_opacity=0.2,    # faint
         showscale=False,       # hide base colorbar
         hoverinfo="skip",
         name="Base (faint)"
@@ -1041,7 +1008,7 @@ def build_two_trace_mapbox(
         colorscale="Reds",
         marker_line_width=1.0,
         marker_line_color="#333",
-        marker_opacity=0.9,     # highlight
+        marker_opacity=0.75,     # highlight
         showscale=True,         # show top colorbar only
         colorbar=colorbar_props,
         hoverinfo="location+z",
@@ -1181,18 +1148,28 @@ layout = dbc.Container(
                                 tooltip={"placement": "bottom"}
                             ),
                         ], className="mb-3"),
-                        # Play/Pause/Clear Buttons
-                        html.Div([
-                            html.Button("▶️ Play", id='play-button', n_clicks=0,
-                                        className="btn btn-secondary mb-2"),
-                            html.Button("⏸ Pause", id='pause-button', n_clicks=0,
-                                        className="btn btn-secondary mb-2"),
-                            html.Button("🗓 Clear Time Range", id='clear-time-range', n_clicks=0,
-                                        className="btn btn-secondary mb-2"),
-                            html.Button("🗑️ Clear Hexes", id='clear-hexes', n_clicks=0,
-                                        className="btn btn-secondary mb-2"),
-                        ], className="mb-3")
                     ]),
+                    # Add to selection toggle
+                    dcc.RadioItems(
+                        id="add-to-selection-toggle",
+                        options=[
+                            {"label": "Add to selection (union)", "value": "yes"},
+                            {"label": "Replace selection (overwrite)", "value": "no"}
+                        ],
+                        value="yes",  # default value
+                        labelStyle={"display": "inline-block", "margin-right": "10px"}
+                    ),
+                    # Play/Pause/Clear Buttons
+                    html.Div([
+                        html.Button("▶️ Play", id='play-button', n_clicks=0,
+                                    className="btn btn-secondary mb-2"),
+                        html.Button("⏸ Pause", id='pause-button', n_clicks=0,
+                                    className="btn btn-secondary mb-2"),
+                        html.Button("🗓 Clear Time Range", id='clear-time-range', n_clicks=0,
+                                    className="btn btn-secondary mb-2"),
+                        html.Button("🗑️ Clear Hexes", id='clear-hexes', n_clicks=0,
+                                    className="btn btn-secondary mb-2"),
+                    ], className="mb-3")
                 ], className="p-3 bg-light rounded")
             ], width=4)
         ], className="my-3"),
