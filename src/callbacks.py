@@ -326,18 +326,21 @@ def update_aggregated_map(global_filter):
 def update_time_series(global_filter):
     permit_type = global_filter.get("permitType", "NB")
     start_idx = global_filter.get("startQuarterIndex", 0)
-    end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
+    end_idx   = global_filter.get("endQuarterIndex", len(quarters) - 1)
     current_idx = global_filter.get("currentQuarterIndex", 0)
     selected_hexes = global_filter.get("selectedHexes", [])
 
+    # 1) Filter data based on selected hexes if any
     if selected_hexes:
         df_filtered = permit_counts_wide[permit_counts_wide["h3_index"].isin(selected_hexes)]
     else:
         df_filtered = permit_counts_wide
 
+    # 2) Aggregate by quarter
     agg_ts = df_filtered.groupby("period")[permit_type].sum().reset_index()
     agg_ts["quarter_idx"] = agg_ts["period"].map(quarter_to_index)
 
+    # 3) Build the basic line figure
     fig = px.line(
         agg_ts,
         x="quarter_idx",
@@ -346,52 +349,90 @@ def update_time_series(global_filter):
         markers=True
     )
 
-    # Update line and marker colors to match Reds colormap
+    # 4) Style the line
     fig.update_traces(
-        line_color='rgb(178, 24, 43)',  # Less intense red from Reds colormap
+        line_color='rgb(178, 24, 43)',
         marker_color='rgb(178, 24, 43)',
         line_width=2,
         marker_size=6
     )
 
-    fig.update_layout(
-        xaxis_title="Time Period",
-        yaxis_title=get_permit_label(permit_type),
-        # Add a light gray vertical line for current time
-        shapes=[
+    # 5) Build shape objects for:
+    #    - The vertical dash line at current_idx
+    #    - Shaded regions outside [start_idx, end_idx]
+    shapes = [
+        # The dashed vertical line indicating current quarter
+        dict(
+            type="line",
+            xref="x",
+            yref="paper",
+            x0=current_idx,
+            x1=current_idx,
+            y0=0,
+            y1=1,
+            line=dict(color="gray", width=3, dash="dash")
+        )
+    ]
+
+    # If the user’s range does NOT start at quarter 0, shade region to the left
+    if start_idx > 0:
+        shapes.append(
             dict(
-                type="line",
+                type="rect",
                 xref="x",
                 yref="paper",
-                x0=current_idx,
-                x1=current_idx,
+                x0=-0.5,                   # extends a bit left of x=0
+                x1=start_idx - 0.5,        # just before the selected start
                 y0=0,
                 y1=1,
-                line=dict(color="gray", width=3, dash="dash")
+                fillcolor="rgba(200,200,200,0.3)",  # grayish
+                line_width=0,
+                layer="below"
             )
-        ],
-        # Minimize whitespace
+        )
+
+    # If the user’s range does NOT end at the final quarter, shade region to the right
+    if end_idx < len(quarters) - 1:
+        shapes.append(
+            dict(
+                type="rect",
+                xref="x",
+                yref="paper",
+                x0=end_idx + 0.5,          # just after the selected end
+                x1=len(quarters) - 0.5,    # extends to the final quarter’s boundary
+                y0=0,
+                y1=1,
+                fillcolor="rgba(200,200,200,0.3)",
+                line_width=0,
+                layer="below"
+            )
+        )
+
+    # 6) Update layout with shapes & the usual style
+    fig.update_layout(
+        shapes=shapes,
+        xaxis_title="Time Period",
+        yaxis_title=permit_type,
         margin=dict(l=50, r=20, t=10, b=50),
         xaxis=dict(
             range=[-0.5, len(quarters) - 0.5],
             showgrid=True,
-            gridcolor='rgba(211, 211, 211, 0.3)',  # Light gray grid
-            fixedrange=True  # Disable zoom on x-axis
+            gridcolor='rgba(211, 211, 211, 0.3)',
+            fixedrange=True
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor='rgba(211, 211, 211, 0.3)',  # Light gray grid
+            gridcolor='rgba(211, 211, 211, 0.3)',
             zeroline=False,
-            fixedrange=True  # Disable zoom on y-axis
+            fixedrange=True
         ),
         plot_bgcolor='white',
         paper_bgcolor='white',
-        # Disable all modebar buttons
         showlegend=False,
-        dragmode=False,
+        dragmode=False
     )
 
-    # Update configuration to disable all interactive features
+    # Configure tick labels (every 4 quarters, etc.)
     fig.update_xaxes(
         tickmode='array',
         tickvals=list(range(0, len(quarters), 4)),
@@ -399,19 +440,8 @@ def update_time_series(global_filter):
         tickangle=45
     )
 
-    # Add static configuration
-    fig.update_layout(
-        modebar=dict(
-            remove=[
-                'zoom', 'pan', 'select', 'lasso2d', 'zoomIn2d', 
-                'zoomOut2d', 'autoScale2d', 'resetScale2d',
-                'hoverClosestCartesian', 'hoverCompareCartesian',
-                'toggleSpikelines'
-            ]
-        )
-    )
-
     return fig
+
 
 
 # ------------------------------------------------------------------------------
@@ -503,3 +533,18 @@ def update_titles(global_filter):
     time_series_title = f"Time-Series of {permit_label}"
     
     return quarterly_title, aggregated_title, time_series_title
+
+@app.callback(
+    Output("period-range-slider", "value"),
+    Input("clear-time-range", "n_clicks"),
+    prevent_initial_call=True
+)
+def reset_time_range(n_clicks):
+    """
+    When the user clicks the Clear Time Range button,
+    reset the slider to [0, len(quarters) - 1].
+    """
+    if n_clicks:
+        return [0, len(quarters) - 1]
+    # If for some reason it's triggered without clicks, do nothing
+    return dash.no_update
