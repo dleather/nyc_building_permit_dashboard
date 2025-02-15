@@ -70,18 +70,28 @@ layout = dbc.Container(
                                 tooltip={"placement": "bottom"}
                             ),
                         ], className="mb-3"),
-                        # Play/Pause/Clear Buttons
-                        html.Div([
-                            html.Button("▶️ Play", id='play-button', n_clicks=0,
-                                        className="btn btn-secondary mb-2"),
-                            html.Button("⏸ Pause", id='pause-button', n_clicks=0,
-                                        className="btn btn-secondary mb-2"),
-                            html.Button("🗓 Clear Time Range", id='clear-time-range', n_clicks=0,
-                                        className="btn btn-secondary mb-2"),
-                            html.Button("🗑️ Clear Hexes", id='clear-hexes', n_clicks=0,
-                                        className="btn btn-secondary mb-2"),
-                        ], className="mb-3")
                     ]),
+                    # Add to selection toggle
+                    dcc.RadioItems(
+                        id="add-to-selection-toggle",
+                        options=[
+                            {"label": "Add to selection (union)", "value": "yes"},
+                            {"label": "Replace selection (overwrite)", "value": "no"}
+                        ],
+                        value="yes",  # default value
+                        labelStyle={"display": "inline-block", "margin-right": "10px"}
+                    ),
+                    # Play/Pause/Clear Buttons
+                    html.Div([
+                        html.Button("▶️ Play", id='play-button', n_clicks=0,
+                                    className="btn btn-secondary mb-2"),
+                        html.Button("⏸ Pause", id='pause-button', n_clicks=0,
+                                    className="btn btn-secondary mb-2"),
+                        html.Button("🗓 Clear Time Range", id='clear-time-range', n_clicks=0,
+                                    className="btn btn-secondary mb-2"),
+                        html.Button("🗑️ Clear Hexes", id='clear-hexes', n_clicks=0,
+                                    className="btn btn-secondary mb-2"),
+                    ], className="mb-3")
                 ], className="p-3 bg-light rounded")
             ], width=4)
         ], className="my-3"),
@@ -96,8 +106,9 @@ layout = dbc.Container(
                         figure={},
                         style={'width': '100%', 'height': '500px'},
                         config={
-                            'modeBarButtonsToAdd': ['lasso2d', 'select2d'],
+                            'scrollZoom': True,
                             'displaylogo': False,
+                            'modeBarButtonsToAdd': ['lasso2d', 'select2d']
                         }
                     )
                 ]),
@@ -110,8 +121,8 @@ layout = dbc.Container(
                         id='map-quarterly',
                         style={'width': '100%', 'height': '500px'},
                         config={
-                            "staticPlot": True,
-                            "scrollZoom": False
+                            'scrollZoom': True,
+                            'displaylogo': False
                         }
                     )
                 ]),
@@ -134,7 +145,18 @@ layout = dbc.Container(
             )
         ),
 
-        # Hidden dcc.Store + Interval + Debug
+        # Hidden dcc.Store for Map View (holds current map center and zoom)
+        dcc.Store(
+            id='map_view_store',
+            data={
+                'center': {'lat': 40.7, 'lon': -73.9},
+                'zoom': 9,
+                'bearing': 0,
+                'pitch': 0
+            }
+        ),
+
+        # Existing Stores, Interval, and Debug Div
         dcc.Store(
             id='global_filter',
             data={

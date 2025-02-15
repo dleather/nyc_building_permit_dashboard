@@ -139,7 +139,7 @@ def get_subrange_singlequarter_99(permit_type: str, start_label: str, end_label:
 def build_log_ticks(new_cmax):
     """
     Build a list of ticks (in log-space) from 0 up to new_cmax,
-    including integer steps and (optionally) the fractional top if needed.
+    including integer steps and always including the min (0) and max value.
 
     Returns (tick_vals, tick_text) for coloraxis ticks.
     Example:
@@ -152,11 +152,14 @@ def build_log_ticks(new_cmax):
     floor_val = int(math.floor(new_cmax))  # e.g. 3 if cmax=3.5
     tick_vals = list(range(floor_val + 1)) # [0,1,2,3]
 
-    # If there's a fractional part > 0, append it
+    # Always include the max value if it's not already included
     if new_cmax > floor_val:
-        tick_vals.append(round(new_cmax, 2))  # e.g. 3.5
+        max_val = round(new_cmax, 2)
+        if max_val not in tick_vals:
+            tick_vals.append(max_val)
 
-    tick_text = [f"{10**v:.0f}" for v in tick_vals]
+    # Generate tick text for all values
+    tick_text = [f"{int(10**v) if v.is_integer() else 10**v:.0f}" for v in tick_vals]
     return tick_vals, tick_text
 
 def build_two_trace_mapbox(
@@ -226,10 +229,10 @@ def build_two_trace_mapbox(
             tickmode="array",
             tickvals=tick_vals,
             ticktext=tick_text,
-            title=f"{permit_type}"
+            title=f"Permits\nIssued"
         )
     else:
-        colorbar_props = dict(title=f"{permit_type}")
+        colorbar_props = dict(title="")
 
     # Top trace (only subset)
     top_trace = go.Choroplethmapbox(
@@ -261,7 +264,8 @@ def build_two_trace_mapbox(
             text=map_title if map_title else "",
             x=0.5
         ),
-        dragmode="select"
+        dragmode="select",
+        uirevision="constant"
     )
     return fig
 
