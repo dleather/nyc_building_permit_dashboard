@@ -1,0 +1,22 @@
+/* assets/custom.css */
+
+/* Target the entire dropdown menu container and its descendants */
+div[role="listbox"],
+div[role="listbox"] * {
+    background-color: rgb(20, 20, 20) !important;
+    color: white !important;
+}
+
+/* Target each option and its inner content */
+div[role="option"],
+div[role="option"] * {
+    background-color: rgb(20, 20, 20) !important;
+    color: white !important;
+}
+
+/* Change background on hover for options */
+div[role="option"]:hover,
+div[role="option"]:hover * {
+    background-color: rgb(50, 50, 50) !important;
+    color: white !important;
+}

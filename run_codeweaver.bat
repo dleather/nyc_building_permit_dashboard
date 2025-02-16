@@ -16,6 +16,7 @@ set "IGNORE_LIST=%IGNORE_LIST%,README.md"
 set "IGNORE_LIST=%IGNORE_LIST%,README_files"
 set "IGNORE_LIST=%IGNORE_LIST%,uv.lock"
 set "IGNORE_LIST=%IGNORE_LIST%,run_codeweaver.bat"
+set "IGNORE_LIST=%IGNORE_LIST%,.env"
 
 REM Run CodeWeaver using the ignore list
 C:\Users\davle\go\bin\CodeWeaver.exe -input . -ignore="%IGNORE_LIST%"

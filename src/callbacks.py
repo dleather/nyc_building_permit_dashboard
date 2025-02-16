@@ -8,6 +8,7 @@ import logging
 from dotenv import load_dotenv
 import os
 from src.data_utils import create_time_series_figure
+import datetime
 
 
 # Load environment variables from .env file
@@ -47,7 +48,25 @@ debug_div = html.Div([
     html.Pre(id='debug-output', style={'whiteSpace': 'pre-wrap'}),
 ], style={'display': 'none'})  # Set to 'block' to see debug output
 
+def log_callback(func):
+    def wrapper(*args, **kwargs):
+        ctx = dash.callback_context  # Get the context to see what triggered this callback
+        logger.info(
+            f"[{datetime.datetime.now()}] Callback '{func.__name__}' triggered with: {ctx.triggered}"
+        )
+        return func(*args, **kwargs)
+    return wrapper
 
+@app.callback(
+    Output("dummy-output", "children"),
+    [Input("map-quarterly", "selectedData"), Input("map-aggregated", "selectedData")],
+    prevent_initial_call=True
+)
+def debug_map_selections(qtr_sel, agg_sel):
+    logger.info("=== debug_map_selections fired ===")
+    logger.info("Quarterly selection: %s", qtr_sel)
+    logger.info("Aggregated selection: %s", agg_sel)
+    return ""
 # ------------------------------------------------------------------------------
 # 1) UPDATE GLOBAL_FILTER BASED ON TIME RANGE SLIDER SELECTION
 # ------------------------------------------------------------------------------
@@ -58,11 +77,13 @@ debug_div = html.Div([
     State("global_filter", "data"),
     prevent_initial_call=True
 )
+@log_callback
 def update_range_slider(range_value, global_filter):
     """
     range_value will be [start_idx, end_idx].
     We'll store them in global_filter and return it.
     """
+    logger.info("In callback update_range_slider, final new_filter=%s", global_filter)
     if range_value is None or len(range_value) != 2:
         return global_filter  # no change
 
@@ -94,6 +115,7 @@ def update_range_slider(range_value, global_filter):
     prevent_initial_call=True
 )
 def update_permit_type(permit_type, global_filter):
+    logger.info("In callback update_permit_type, final new_filter=%s", global_filter)
     global_filter["permitType"] = permit_type
     return global_filter
 
@@ -109,6 +131,7 @@ def update_permit_type(permit_type, global_filter):
     prevent_initial_call=True
 )
 def toggle_play(play_clicks, pause_clicks, global_filter):
+    logger.info("In callback toggle_play, final new_filter=%s", global_filter)
     ctx = dash.callback_context
     if not ctx.triggered:
         return global_filter
@@ -132,6 +155,7 @@ def toggle_play(play_clicks, pause_clicks, global_filter):
     prevent_initial_call=True
 )
 def update_speed_dropdown(selected_speed, global_filter):
+    logger.info("In callback update_speed_dropdown, final new_filter=%s", global_filter)
     global_filter["speed"] = selected_speed
     return global_filter
 
@@ -162,6 +186,7 @@ def control_animation_interval(global_filter):
     prevent_initial_call=True
 )
 def advance_current_quarter(n_intervals, global_filter):
+    logger.info("In callback advance_current_quarter, final new_filter=%s", global_filter)
     # Read the current quarter index and the start/end
     current_idx = global_filter.get("currentQuarterIndex", 0)
     start_idx   = global_filter.get("startQuarterIndex", 0)
@@ -192,47 +217,40 @@ def update_quarterly_map(global_filter, map_view):
     current_idx = global_filter.get("currentQuarterIndex", 0)
     start_idx = global_filter["startQuarterIndex"]
     end_idx = global_filter["endQuarterIndex"]
-    selected_hex = global_filter.get("selectedHexes", [])  # Get selected hexes with empty list default
+    selected_hex = global_filter.get("selectedHexes", [])
     
     quarter_label = quarters[current_idx]
     
-    # Get all data for the current quarter (this will be our base layer)
-    df_base = permit_counts_wide.loc[
+    # Get all data for the current quarter
+    df_all = permit_counts_wide.loc[
         permit_counts_wide["period"] == quarter_label
     ].copy()
-
-    # For the top layer, create a new DataFrame that only includes selected hexes
-    if global_filter.get("resetMaps", False):
-        df_top = df_base.copy()  # Show everything if reset is True
-    elif not selected_hex:
-        df_top = pd.DataFrame(columns=df_base.columns)  # Empty DataFrame if no selection
-    else:
-        df_top = df_base[df_base["h3_index"].isin(selected_hex)].copy()  # Only selected hexes
     
-    # Use the global maximum for the base layer
+    # When not in reset mode and the user has made a custom selection,
+    # exclude the selected hexes from the base layer so they're not drawn twice.
+    if not global_filter.get("resetMaps", False) and selected_hex:
+        df_base = df_all[~df_all["h3_index"].isin(selected_hex)].copy()
+        df_top = df_all[df_all["h3_index"].isin(selected_hex)].copy()
+    else:
+        # Otherwise, both layers show the full data.
+        df_base = df_all.copy()
+        df_top = df_all.copy()
+    
+    # Use the global max value within the selected time range (and for the given permit type)
     start_label = quarters[start_idx]
     end_label = quarters[end_idx]
     global_max = get_subrange_singlequarter_99(permit_type, start_label, end_label)
-    use_log = global_max > 100  # Or use should_use_log_scale() with full range data
-    
-    # Debug output
-    #logger.info(f"Current quarter: {quarter_label}")
-    #logger.info(f"Selected hexes: {len(selected_hex)}")
-    #logger.info(f"Permit type: {permit_type}")
-    #logger.info(f"Global max: {global_max}")
-    #logger.info(f"df_current shape: {df_current.shape}")
-    #logger.info(f"df_sub_seln shape: {df_sub_seln.shape}")
+    use_log = global_max > 100
     
     cmin_base = 0
     cmax_base = global_max
     
-    # Set the top layer scale based on reset state
+    # For non-reset selection, use the same scale;
+    # otherwise, the top layer shares scale with the base layer when resetMaps is True.
     cmin_top = 0
-    if global_filter.get("resetMaps", False):
-        cmax_top = cmax_base  # Use same scale as base when reset
-    else:
-        cmax_top = global_max
-
+    cmax_top = cmax_base if global_filter.get("resetMaps", False) else global_max
+    logger.info("Currently selectedHexes in quarterly map: %s", selected_hex)
+    logger.info("df_top has hexes in quarterly map: %s", df_top["h3_index"].tolist())
     fig = build_two_trace_mapbox(
         df_base=df_base,
         df_top=df_top,
@@ -246,7 +264,6 @@ def update_quarterly_map(global_filter, map_view):
         use_log_top=use_log
     )
     
-    # If map_view is not defined, fallback to default view settings
     if not map_view:
         map_view = {
             "center": {"lat": 40.7, "lon": -73.9},
@@ -255,7 +272,6 @@ def update_quarterly_map(global_filter, map_view):
             "pitch": 0
         }
     
-    # Apply stored view settings to keep the maps in sync
     fig.update_layout(
         mapbox=dict(
             style=MAPBOX_STYLE,
@@ -265,7 +281,7 @@ def update_quarterly_map(global_filter, map_view):
             bearing=map_view.get("bearing"),
             pitch=map_view.get("pitch")
         ),
-        uirevision="synced-maps"  # fixed revision so that user interactions are preserved
+        uirevision="synced-maps"
     )
     return fig
 
@@ -284,11 +300,6 @@ def update_aggregated_map(global_filter, map_view):
     end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
     selected_hex = global_filter.get("selectedHexes", [])
     reset_maps = global_filter.get("resetMaps", False)  # Check for reset flag
-    #logger.info("update_aggregated_map triggered")
-    #logger.info("global_filter.selectedHexes: %s", selected_hex)
-    #logger.info("reset_maps: %s", reset_maps)
-    #logger.info("start_idx: %s", start_idx)
-    #logger.info("end_idx: %s", end_idx)
 
     start_label = quarters[start_idx]
     end_label   = quarters[end_idx]
@@ -303,33 +314,31 @@ def update_aggregated_map(global_filter, map_view):
         return px.choropleth_mapbox()
     
     df_agg = df_sub.groupby("h3_index", as_index=False)[permit_type].sum()
-    #df_agg = ensure_all_hexes(df_agg, permit_type)
     
     cmin_base = 0
     cmax_base = global_agg_99[permit_type]
     use_log = global_agg_99[permit_type] > 100
     
-    # 2) Determine the top layer based on hex selections or reset flag.
-    #logger.info("reset_maps: %s", reset_maps)
-    #logger.info("selected_hex: %s", selected_hex)
-    # For the top layer, create a new DataFrame that only includes selected hexes
-    if global_filter.get("resetMaps", False):
-        df_top = df_agg.copy()  # Show all hexes in top layer
-    elif not selected_hex:
-        df_top = df_agg.copy() # Empty when no selection
+    # If there is a non-reset custom selection, exclude selected hexes from the base layer.
+    if not reset_maps and selected_hex:
+        df_base = df_agg[~df_agg["h3_index"].isin(selected_hex)].copy()
+        df_top = df_agg[df_agg["h3_index"].isin(selected_hex)].copy()
     else:
-        df_top = df_agg[df_agg["h3_index"].isin(selected_hex)]
+        df_base = df_agg.copy()
+        df_top = df_agg.copy()
+    
     logger.info("df_top length: %s", len(df_top))
     
-    # 3) Build the figure using our helper function
     cmin_top = 0
-    if global_filter.get("resetMaps", False):
-        # Use the same scale for both layers when reset is true
+    if reset_maps:
         cmax_top = cmax_base
     else:
         cmax_top = df_top[permit_type].max() if not df_top.empty else 0
+    logger.info("Currently selectedHexes in aggregated map: %s", selected_hex)
+    logger.info("df_top has hexes in aggregated map: %s", df_top["h3_index"].tolist())
+    # 3) Build the figure using our helper function
     fig = build_two_trace_mapbox(
-        df_base=df_agg,
+        df_base=df_base,
         df_top=df_top,
         permit_type=permit_type,
         cmin_base=cmin_base,
@@ -350,36 +359,16 @@ def update_aggregated_map(global_filter, map_view):
             "pitch": 0
         }
     
-    # Mapbox styles that should work:
-    # - carto-positron (free)
-    # - carto-darkmatter (free)
-    # - stamen-terrain (free)
-    # - open-street-map (free)
-    # - white-bg (free)
-    # - satellite-streets (requires token)
-    # - dark (requires token) 
-    # - light (requires token)
-    # - streets (requires token)
-    # - outdoors (requires token)
-    # - satellite (requires token)
-    
-    # Only carto-positron is working because it's one of the few free styles
-    # that don't require a Mapbox access token. To use other styles, we would
-    # need to:
-    # 1. Get a Mapbox access token
-    # 2. Configure it in the app
-    # 3. Pass it to the figure via fig.update_layout(mapbox_accesstoken=token)
-    
     fig.update_layout(
         mapbox=dict(
             style=MAPBOX_STYLE,
             accesstoken=mapbox_token,
             center=map_view.get("center"),
-            zoom=map_view.get("zoom"),
+            uirevision="synced-maps",  # maintains the same ui revision across re-renders
             bearing=map_view.get("bearing"),
             pitch=map_view.get("pitch")
         ),
-        uirevision="synced-maps"  # maintains the same ui revision across re-renders
+        uirevision="synced-maps"  # maintains the same UI revision across re-renders
     )
     return fig
 
@@ -431,7 +420,9 @@ def update_time_series(global_filter):
     ],
     prevent_initial_call=True
 )
+@log_callback
 def update_selected_hexes(qtr_sel, agg_sel, clear_n_clicks, global_filter):
+    logger.info("In callback update_selected_hexes, final new_filter=%s", global_filter)
     ctx = dash.callback_context
     if not ctx.triggered:
         return global_filter
@@ -451,11 +442,17 @@ def update_selected_hexes(qtr_sel, agg_sel, clear_n_clicks, global_filter):
 
     # Handle new selections
     selected_data = qtr_sel if trigger_id == "map-quarterly" else agg_sel
-    new_points = (selected_data or {}).get("points", [])
-    new_sel = set(p["location"] for p in new_points)
+    all_points = (selected_data or {}).get("points", [])
+
+    # Filter out top-layer points:
+    base_points = [p for p in all_points if p["curveNumber"] == 0]
+    new_sel = set(p["location"] for p in base_points)
+
     new_filter["selectedHexes"] = list(new_sel)
-    
+
+    logger.info("update_selected_hexes new_sel after filtering: %s", new_sel)   
     return new_filter
+
 @app.callback(
     Output("global_filter", "data", allow_duplicate=True),
     Input("map-aggregated", "figure"),
@@ -465,11 +462,13 @@ def update_selected_hexes(qtr_sel, agg_sel, clear_n_clicks, global_filter):
 )
 def clear_reset_flag(_, __, global_filter):
     """Resets the resetMaps flag after maps have updated"""
+    logger.info("In callback clear_reset_flag, final new_filter=%s", global_filter)
     if global_filter.get("resetMaps", False):
         new_filter = dict(global_filter)
         new_filter["resetMaps"] = False
         return new_filter
     return dash.no_update
+
 @app.callback(
     [Output("map-quarterly-title", "children"),
      Output("map-aggregated-title", "children"),

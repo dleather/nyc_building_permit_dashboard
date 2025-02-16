@@ -388,28 +388,36 @@ def create_time_series_figure(df, permit_type, selected_range=None):
         )
     ))
 
-    # Update the layout with darker theme to match carto-darkmatter
+    # Update the layout with darker theme and larger ticks
     fig.update_layout(
-        plot_bgcolor='rgb(12, 12, 12)',        # Much darker background
-        paper_bgcolor='rgb(12, 12, 12)',       # Matching paper color
+        plot_bgcolor='rgb(12, 12, 12)',
+        paper_bgcolor='rgb(12, 12, 12)',
         font=dict(
             color='rgba(255, 255, 255, 0.7)'
         ),
         xaxis=dict(
             showgrid=True,
-            gridcolor='rgba(255, 255, 255, 0.08)',  # More subtle grid
-            tickfont=dict(color='rgba(255, 255, 255, 0.7)'),
+            gridcolor='rgba(255, 255, 255, 0.08)',
+            tickfont=dict(
+                color='rgba(255, 255, 255, 0.7)',
+                size=14  # Increased font size
+            ),
+            tickangle=45,  # Rotate labels 45 degrees
+            dtick=4,  # Show every 4th tick (changed from 2)
             zeroline=False,
             gridwidth=1
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor='rgba(255, 255, 255, 0.08)',  # More subtle grid
-            tickfont=dict(color='rgba(255, 255, 255, 0.7)'),
+            gridcolor='rgba(255, 255, 255, 0.08)',
+            tickfont=dict(
+                color='rgba(255, 255, 255, 0.7)',
+                size=14  # Increased font size
+            ),
             zeroline=False,
             gridwidth=1
         ),
-        margin=dict(l=40, r=40, t=40, b=40),
+        margin=dict(l=40, r=40, t=40, b=80),  # Increased bottom margin for rotated labels
         hovermode='x unified',
         showlegend=False
     )
@@ -421,7 +429,7 @@ def create_time_series_figure(df, permit_type, selected_range=None):
         fig.add_vrect(
             x0=start_period,
             x1=end_period,
-            fillcolor='rgba(255, 255, 255, 0.05)',  # More subtle highlight
+            fillcolor='rgba(255, 255, 255, 0.05)',
             layer='below',
             line_width=0
         )

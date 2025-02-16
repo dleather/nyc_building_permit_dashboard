@@ -42,52 +42,82 @@ layout = dbc.Container(
                 html.Div([
                     html.H4("Controls", style={'color': 'rgba(255, 255, 255, 0.8)'}),
                     html.Hr(style={'borderColor': 'rgba(255, 255, 255, 0.2)'}),
+                    dbc.Row([
+                        dbc.Col(
+                            html.Div([
+                                html.Label("Permit Type", style={'color': 'rgba(255, 255, 255, 0.7)'}),
+                                dcc.RadioItems(
+                                    id="permit-type",
+                                    options=permit_options,
+                                    value="NB",
+                                    className="mb-3",
+                                    style={'color': 'rgba(255, 255, 255, 0.7)'},
+                                    labelStyle={'marginRight': '10px'}
+                                )
+                            ]),
+                            width=6
+                        ),
+                        dbc.Col(
+                            html.Div([
+                                html.Label("Animation Speed", style={'color': 'rgba(255, 255, 255, 0.7)'}),
+                                dcc.RadioItems(
+                                    id="speed-radio",
+                                    options=[
+                                        {"label": "Slow", "value": 2000},
+                                        {"label": "Medium", "value": 1000},
+                                        {"label": "Fast", "value": 500}
+                                    ],
+                                    value=1000,
+                                    className="mb-3",
+                                    style={'color': 'rgba(255, 255, 255, 0.7)'},
+                                    labelStyle={'marginRight': '10px'}
+                                )
+                            ]),
+                            width=6
+                        )
+                    ], className="mb-3"),
+                    html.Label("Select Time Range:", style={'color': 'rgba(255, 255, 255, 0.7)'}),
+                    dcc.RangeSlider(
+                        id="period-range-slider",
+                        min=0,
+                        max=len(quarters) - 1,
+                        value=[0, len(quarters) - 1],
+                        marks={i: quarters[i] for i in range(0, len(quarters), 16)},
+                        className="mb-3"
+                    ),
                     html.Div([
-                        html.Label("Permit Type", style={'color': 'rgba(255, 255, 255, 0.7)'}),
-                        dcc.RadioItems(
-                            id="permit-type",
-                            options=permit_options,
-                            value="NB",
-                            className="mb-3",
-                            style={'color': 'rgba(255, 255, 255, 0.7)'},
-                            labelStyle={'marginRight': '10px'}
+                        dbc.Button([
+                            html.I(className="fas fa-play me-1", style={"color": "black"}),
+                            html.Span("Play", style={"color": "black"})
+                        ], 
+                            id="play-button", 
+                            color="success",
+                            className="me-2"
                         ),
-                        html.Label("Animation Speed:", style={'color': 'rgba(255, 255, 255, 0.7)'}),
-                        dcc.Dropdown(
-                            id="speed-dropdown",
-                            options=[
-                                {"label": "Slow", "value": 2000},
-                                {"label": "Medium", "value": 1000},
-                                {"label": "Fast", "value": 500}
-                            ],
-                            value=1000,
-                            className="mb-3",
-                            style={
-                                'backgroundColor': 'rgb(20, 20, 20)',
-                                'color': 'white'
-                            }
+                        dbc.Button([
+                            html.I(className="fas fa-pause me-1", style={"color": "black"}),
+                            html.Span("Pause", style={"color": "black"})
+                        ], 
+                            id="pause-button", 
+                            color="warning",
+                            className="me-2"
                         ),
-                        html.Label("Select Time Range:", style={'color': 'rgba(255, 255, 255, 0.7)'}),
-                        dcc.RangeSlider(
-                            id="period-range-slider",
-                            min=0,
-                            max=len(quarters) - 1,
-                            value=[0, len(quarters) - 1],
-                            marks={i: quarters[i] for i in range(0, len(quarters), 8)},
-                            className="mb-3"
+                        dbc.Button([
+                            html.I(className="fas fa-clock me-1"),
+                            "Clear Time Range"
+                        ], 
+                            id="clear-time-range", 
+                            color="secondary",
+                            className="me-2"
                         ),
-                        html.Div([
-                            dbc.Button("▶ Play", id="play-button", color="primary", className="me-2"),
-                            dbc.Button("⏸ Pause", id="pause-button", color="secondary", className="me-2"),
-                            dbc.Button([html.I(className="fas fa-clock me-1"), "Clear Time Range"], 
-                                     id="clear-time-range", 
-                                     color="info", 
-                                     className="me-2"),
-                            dbc.Button([html.I(className="fas fa-eraser me-1"), "Clear Hexes"], 
-                                     id="clear-hexes", 
-                                     color="warning"),
-                        ], className="d-flex justify-content-start gap-2 mb-3")
-                    ], style={'padding': '15px'})
+                        dbc.Button([
+                            html.I(className="fas fa-eraser me-1"),
+                            "Clear Hexes"
+                        ], 
+                            id="clear-hexes", 
+                            color="danger",
+                        ),
+                    ], className="d-flex justify-content-start gap-2 mb-3")
                 ], style={
                     'backgroundColor': 'rgb(15, 15, 15)',
                     'borderRadius': '5px',
