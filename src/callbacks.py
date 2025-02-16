@@ -209,80 +209,32 @@ from src.data_utils import ensure_all_hexes, global_quarterly_99, all_hexes
 
 @app.callback(
     Output("map-quarterly", "figure"),
-    Input("global_filter", "data"),
-    Input("map_view_store", "data")
+    [Input("global_filter", "data"), Input("map_view_store", "data")]
 )
 def update_quarterly_map(global_filter, map_view):
     permit_type = global_filter.get("permitType", "NB")
+    selected_idx_list = global_filter.get("selectedIndicesQuarterly", None)
     current_idx = global_filter.get("currentQuarterIndex", 0)
-    start_idx = global_filter["startQuarterIndex"]
-    end_idx = global_filter["endQuarterIndex"]
-    selected_hex = global_filter.get("selectedHexes", [])
-    
     quarter_label = quarters[current_idx]
     
-    # Get all data for the current quarter
     df_all = permit_counts_wide.loc[
         permit_counts_wide["period"] == quarter_label
     ].copy()
+    df_plot = df_all.sort_values("h3_index").reset_index(drop=True)
     
-    # When not in reset mode and the user has made a custom selection,
-    # exclude the selected hexes from the base layer so they're not drawn twice.
-    if not global_filter.get("resetMaps", False) and selected_hex:
-        df_base = df_all[~df_all["h3_index"].isin(selected_hex)].copy()
-        df_top = df_all[df_all["h3_index"].isin(selected_hex)].copy()
-    else:
-        # Otherwise, both layers show the full data.
-        df_base = df_all.copy()
-        df_top = df_all.copy()
+    fig = build_single_choropleth_map(df_plot, permit_type, "Quarterly View")
+    fig.update_traces(selectedpoints=selected_idx_list)
     
-    # Use the global max value within the selected time range (and for the given permit type)
-    start_label = quarters[start_idx]
-    end_label = quarters[end_idx]
-    global_max = get_subrange_singlequarter_99(permit_type, start_label, end_label)
-    use_log = global_max > 100
-    
-    cmin_base = 0
-    cmax_base = global_max
-    
-    # For non-reset selection, use the same scale;
-    # otherwise, the top layer shares scale with the base layer when resetMaps is True.
-    cmin_top = 0
-    cmax_top = cmax_base if global_filter.get("resetMaps", False) else global_max
-    logger.info("Currently selectedHexes in quarterly map: %s", selected_hex)
-    logger.info("df_top has hexes in quarterly map: %s", df_top["h3_index"].tolist())
-    fig = build_two_trace_mapbox(
-        df_base=df_base,
-        df_top=df_top,
-        permit_type=permit_type,
-        cmin_base=cmin_base,
-        cmax_base=cmax_base,
-        cmin_top=cmin_top,
-        cmax_top=cmax_top,
-        map_title="Quarterly View",
-        use_log_base=use_log,
-        use_log_top=use_log
-    )
-    
-    if not map_view:
-        map_view = {
-            "center": {"lat": 40.7, "lon": -73.9},
-            "zoom": 10,
-            "bearing": 0,
-            "pitch": 0
-        }
-    
-    fig.update_layout(
-        mapbox=dict(
-            style=MAPBOX_STYLE,
-            accesstoken=mapbox_token,
-            center=map_view.get("center"),
-            zoom=map_view.get("zoom"),
-            bearing=map_view.get("bearing"),
-            pitch=map_view.get("pitch")
-        ),
-        uirevision="synced-maps"
-    )
+    if map_view:
+        fig.update_layout(
+            map=dict(
+                center=map_view.get("center"),
+                zoom=map_view.get("zoom"),
+                bearing=map_view.get("bearing"),
+                pitch=map_view.get("pitch")
+            ),
+            uirevision="synced-maps"
+        )
     return fig
 
 
@@ -291,85 +243,51 @@ def update_quarterly_map(global_filter, map_view):
 # ------------------------------------------------------------------------------
 @app.callback(
     Output("map-aggregated", "figure"),
-    Input("global_filter", "data"),
-    Input("map_view_store", "data")
+    [Input("global_filter", "data"), Input("map_view_store", "data")]
 )
 def update_aggregated_map(global_filter, map_view):
     permit_type = global_filter.get("permitType", "NB")
     start_idx = global_filter.get("startQuarterIndex", 0)
     end_idx = global_filter.get("endQuarterIndex", len(quarters) - 1)
-    selected_hex = global_filter.get("selectedHexes", [])
-    reset_maps = global_filter.get("resetMaps", False)  # Check for reset flag
-
-    start_label = quarters[start_idx]
-    end_label   = quarters[end_idx]
     
-    # 1) Build the base DataFrame (aggregating over the selected time range)
+    start_label = quarters[start_idx]
+    end_label = quarters[end_idx]
+    
+    # Prepare aggregated data over the selected time range
     df_sub = permit_counts_wide.loc[
         (permit_counts_wide["period"] >= start_label) &
         (permit_counts_wide["period"] <= end_label)
     ].copy()
     
     if df_sub.empty:
-        return px.choropleth_mapbox()
+        return px.choropleth_mapbox()  # Return an empty figure if no data
     
     df_agg = df_sub.groupby("h3_index", as_index=False)[permit_type].sum()
+    df_plot = df_agg.sort_values("h3_index").reset_index(drop=True)
     
-    cmin_base = 0
-    cmax_base = global_agg_99[permit_type]
-    use_log = global_agg_99[permit_type] > 100
+    selected_idx_list = global_filter.get("selectedIndicesAggregated", None)
     
-    # If there is a non-reset custom selection, exclude selected hexes from the base layer.
-    if not reset_maps and selected_hex:
-        df_base = df_agg[~df_agg["h3_index"].isin(selected_hex)].copy()
-        df_top = df_agg[df_agg["h3_index"].isin(selected_hex)].copy()
+    # Build the single choropleth map for aggregated data
+    fig = build_single_choropleth_map(df_plot, permit_type, "Aggregated View")
+    
+    # Apply selection styling
+    if selected_idx_list is not None:
+        fig.update_traces(selectedpoints=selected_idx_list, selector=dict(type="choroplethmapbox"))
     else:
-        df_base = df_agg.copy()
-        df_top = df_agg.copy()
+        fig.update_traces(selectedpoints=None, selector=dict(type="choroplethmapbox"))
     
-    logger.info("df_top length: %s", len(df_top))
-    
-    cmin_top = 0
-    if reset_maps:
-        cmax_top = cmax_base
-    else:
-        cmax_top = df_top[permit_type].max() if not df_top.empty else 0
-    logger.info("Currently selectedHexes in aggregated map: %s", selected_hex)
-    logger.info("df_top has hexes in aggregated map: %s", df_top["h3_index"].tolist())
-    # 3) Build the figure using our helper function
-    fig = build_two_trace_mapbox(
-        df_base=df_base,
-        df_top=df_top,
-        permit_type=permit_type,
-        cmin_base=cmin_base,
-        cmax_base=cmax_base,
-        cmin_top=cmin_top,
-        cmax_top=cmax_top,
-        map_title="Aggregated View",
-        use_log_base=use_log,
-        use_log_top=use_log
-    )
-    
-    # 4) Apply stored view settings and return the figure
-    if not map_view:
-        map_view = {
-            "center": {"lat": 40.7, "lon": -73.9},
-            "zoom": 10,
-            "bearing": 0,
-            "pitch": 0
-        }
-    
-    fig.update_layout(
-        mapbox=dict(
-            style=MAPBOX_STYLE,
-            accesstoken=mapbox_token,
-            center=map_view.get("center"),
-            uirevision="synced-maps",  # maintains the same ui revision across re-renders
-            bearing=map_view.get("bearing"),
-            pitch=map_view.get("pitch")
-        ),
-        uirevision="synced-maps"  # maintains the same UI revision across re-renders
-    )
+    # Update map view settings
+    if map_view:
+        fig.update_layout(
+            mapbox=dict(
+                style=MAPBOX_STYLE,
+                accesstoken=mapbox_token,
+                center=map_view.get("center"),
+                bearing=map_view.get("bearing"),
+                pitch=map_view.get("pitch")
+            ),
+            uirevision="synced-maps"
+        )
     return fig
 
 
@@ -415,42 +333,35 @@ def update_time_series(global_filter):
         Input("map-aggregated", "selectedData"),
         Input("clear-hexes", "n_clicks")
     ],
-    [
-        State("global_filter", "data"),
-    ],
+    [State("global_filter", "data")],
     prevent_initial_call=True
 )
-@log_callback
 def update_selected_hexes(qtr_sel, agg_sel, clear_n_clicks, global_filter):
-    logger.info("In callback update_selected_hexes, final new_filter=%s", global_filter)
     ctx = dash.callback_context
-    if not ctx.triggered:
-        return global_filter
-
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    
-    # Create a new copy of global_filter to modify
     new_filter = dict(global_filter)
     
-    # Clear any previous resetMaps flag
-    new_filter["resetMaps"] = False
-    
-    if trigger_id == "clear-hexes":
-        new_filter["selectedHexes"] = []
-        new_filter["resetMaps"] = True
+    # Clear selection when the user clicks "Clear Hexes"
+    if ctx.triggered and "clear-hexes" in ctx.triggered[0]["prop_id"]:
+        new_filter["selectedIndicesQuarterly"] = None
+        new_filter["selectedIndicesAggregated"] = None
         return new_filter
-
-    # Handle new selections
-    selected_data = qtr_sel if trigger_id == "map-quarterly" else agg_sel
-    all_points = (selected_data or {}).get("points", [])
-
-    # Filter out top-layer points:
-    base_points = [p for p in all_points if p["curveNumber"] == 0]
-    new_sel = set(p["location"] for p in base_points)
-
-    new_filter["selectedHexes"] = list(new_sel)
-
-    logger.info("update_selected_hexes new_sel after filtering: %s", new_sel)   
+    
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+    sel_data = qtr_sel if trigger == "map-quarterly" else agg_sel
+    
+    if sel_data and "points" in sel_data:
+        # pointIndex is the row index in the sorted DataFrame (i.e. the "point")
+        idx_list = [pt["pointIndex"] for pt in sel_data["points"]]
+        if trigger == "map-quarterly":
+            new_filter["selectedIndicesQuarterly"] = idx_list
+        else:
+            new_filter["selectedIndicesAggregated"] = idx_list
+    else:
+        if trigger == "map-quarterly":
+            new_filter["selectedIndicesQuarterly"] = None
+        else:
+            new_filter["selectedIndicesAggregated"] = None
+    
     return new_filter
 
 @app.callback(
@@ -541,14 +452,14 @@ def update_map_view(agg_relayout, qtr_relayout, current_view):
         updated = {}
         if not rld:
             return {}
-        if 'mapbox.center' in rld:
-            updated['center'] = rld['mapbox.center']
-        if 'mapbox.zoom' in rld:
-            updated['zoom'] = rld['mapbox.zoom']
-        if 'mapbox.bearing' in rld:
-            updated['bearing'] = rld['mapbox.bearing']
-        if 'mapbox.pitch' in rld:
-            updated['pitch'] = rld['mapbox.pitch']
+        if 'map.center' in rld:
+            updated['center'] = rld['map.center']
+        if 'map.zoom' in rld:
+            updated['zoom'] = rld['map.zoom']
+        if 'map.bearing' in rld:
+            updated['bearing'] = rld['map.bearing']
+        if 'map.pitch' in rld:
+            updated['pitch'] = rld['map.pitch']
         return updated
 
     # Grab whichever relayoutData is available from the triggered map
@@ -563,3 +474,43 @@ def update_map_view(agg_relayout, qtr_relayout, current_view):
     updated_view.update(new_view)
 
     return updated_view
+
+def build_single_choropleth_map(df_plot, permit_type, map_title):
+    fig = go.Figure(
+        go.Choroplethmap(
+            geojson=hex_geojson,
+            featureidkey="properties.h3_index",
+            locations=df_plot["h3_index"],
+            z=df_plot[permit_type],
+            marker=dict(
+                line=dict(width=1, color="white")
+            ),
+            selected=dict(
+                marker=dict(opacity=1)
+            ),
+            unselected=dict(
+                marker=dict(opacity=0.3)
+            ),
+            selectedpoints=None,
+            colorscale="Reds",
+            zmin=0,
+            zmax=get_global_max_for_permit_type(permit_type),
+            hoverinfo="location+z",
+        )
+    )
+
+    fig.update_layout(
+        title=dict(text=map_title, x=0.5),
+        margin=dict(r=0, t=30, l=0, b=0),
+        dragmode="select",
+        uirevision="constant",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        mapbox=dict(
+            style=MAPBOX_STYLE,
+            accesstoken=mapbox_token,
+            center={"lat": 40.7, "lon": -73.9},
+            zoom=9
+        )
+    )
+    return fig
