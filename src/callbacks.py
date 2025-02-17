@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 import os
 from src.data_utils import create_time_series_figure
 import datetime
+import pandas as pd
+from src.data_utils import permit_counts_wide, quarters
 
 
 # Load environment variables from .env file
@@ -68,100 +70,177 @@ def debug_map_selections(qtr_sel, agg_sel):
     logger.info("Aggregated selection: %s", agg_sel)
     return ""
 # ------------------------------------------------------------------------------
-# 1) UPDATE GLOBAL_FILTER BASED ON TIME RANGE SLIDER SELECTION
+# 1) Aggragtor callback
 # ------------------------------------------------------------------------------
-
 @app.callback(
-    Output("global_filter", "data", allow_duplicate=True),
+    Output("global_filter", "data"),
     Input("period-range-slider", "value"),
-    State("global_filter", "data"),
-    prevent_initial_call=True
-)
-@log_callback
-def update_range_slider(range_value, global_filter):
-    """
-    range_value will be [start_idx, end_idx].
-    We'll store them in global_filter and return it.
-    """
-    logger.info("In callback update_range_slider, final new_filter=%s", global_filter)
-    if range_value is None or len(range_value) != 2:
-        return global_filter  # no change
-
-    start_idx, end_idx = range_value
-    start_idx = int(start_idx)
-    end_idx = int(end_idx)
-
-    # clamp them just in case
-    start_idx = max(0, min(start_idx, len(quarters)-1))
-    end_idx   = max(0, min(end_idx, len(quarters)-1))
-
-    global_filter["startQuarterIndex"] = start_idx
-    global_filter["endQuarterIndex"]   = end_idx
-    
-    # If currentQuarterIndex is outside [start_idx, end_idx], clamp to start_idx
-    current_idx = global_filter.get("currentQuarterIndex", 0)
-    if current_idx < start_idx or current_idx > end_idx:
-        global_filter["currentQuarterIndex"] = start_idx
-
-    return global_filter
-
-# ------------------------------------------------------------------------------
-# 2) PERMIT TYPE RADIO -> UPDATE PERMIT TYPE IN GLOBAL_FILTER
-# ------------------------------------------------------------------------------
-@app.callback(
-    Output("global_filter", "data", allow_duplicate=True),
-    Input("permit-type", "value"),  # Radio or Dropdown for permit type
-    State("global_filter", "data"),
-    prevent_initial_call=True
-)
-def update_permit_type(permit_type, global_filter):
-    logger.info("In callback update_permit_type, final new_filter=%s", global_filter)
-    global_filter["permitType"] = permit_type
-    return global_filter
-
-
-# ------------------------------------------------------------------------------
-# 3) PLAY / PAUSE -> UPDATE "play" FIELD IN GLOBAL_FILTER
-# ------------------------------------------------------------------------------
-@app.callback(
-    Output("global_filter", "data", allow_duplicate=True),
+    Input("permit-type", "value"),
     Input("play-button", "n_clicks"),
     Input("pause-button", "n_clicks"),
+    Input("speed-radio", "value"),
+    Input("animation-interval", "n_intervals"),
+    Input("map-quarterly", "selectedData"),
+    Input("map-aggregated", "selectedData"),
+    Input("clear-hexes", "n_clicks"),
+    Input("clear-time-range", "n_clicks"),
     State("global_filter", "data"),
     prevent_initial_call=True
 )
-def toggle_play(play_clicks, pause_clicks, global_filter):
-    logger.info("In callback toggle_play, final new_filter=%s", global_filter)
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return global_filter
+def aggregator_callback(
+    slider_value,
+    permit_value,
+    play_clicks,
+    pause_clicks,
+    speed_value,
+    n_intervals,
+    qtr_sel,
+    agg_sel,
+    clear_hexes_clicks,
+    clear_time_clicks,
+    global_filter
+):
+    """
+    Single aggregator callback that updates global_filter's fields:
+      - Time range slider
+      - Permit type
+      - Play/Pause
+      - Speed
+      - Advance current quarter
+      - Selected hexes
+      - Clear hexes
+      - Clear time range
+    """
+    import dash
+    from src.data_utils import quarters, permit_counts_wide
 
-    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-    if trigger_id == "play-button":
-        global_filter["play"] = True
-    elif trigger_id == "pause-button":
-        global_filter["play"] = False
+    ctx = dash.callback_context  # to see what triggered
+    triggered_ids = [t["prop_id"].split(".")[0] for t in ctx.triggered]
 
-    return global_filter
+    # Copy so we don't mutate global_filter in-place
+    new_filter = dict(global_filter)
+
+    # 1) If the slider changed...
+    if "period-range-slider" in triggered_ids and slider_value is not None:
+        if len(slider_value) == 2:
+            start_idx, end_idx = slider_value
+            start_idx = max(0, min(start_idx, len(quarters) - 1))
+            end_idx   = max(0, min(end_idx, len(quarters) - 1))
+            new_filter["startQuarterIndex"] = start_idx
+            new_filter["endQuarterIndex"]   = end_idx
+            # Clamp currentQuarterIndex into [start_idx, end_idx]
+            curr_idx = new_filter.get("currentQuarterIndex", 0)
+            if curr_idx < start_idx or curr_idx > end_idx:
+                new_filter["currentQuarterIndex"] = start_idx
+
+    # 2) If the permit changed...
+    if "permit-type" in triggered_ids and permit_value is not None:
+        new_filter["permitType"] = permit_value
+
+    # 3) If play/pause changed...
+    if "play-button" in triggered_ids:
+        new_filter["play"] = True
+    if "pause-button" in triggered_ids:
+        new_filter["play"] = False
+
+    # 4) If speed changed...
+    if "speed-radio" in triggered_ids and speed_value is not None:
+        new_filter["speed"] = speed_value
+
+    # 5) If interval ticked => advance quarter
+    if "animation-interval" in triggered_ids:
+        current_idx = new_filter.get("currentQuarterIndex", 0)
+        start_idx   = new_filter.get("startQuarterIndex", 0)
+        end_idx     = new_filter.get("endQuarterIndex", len(quarters) - 1)
+        new_idx = current_idx + 1
+        # Example: wrap around or clamp
+        if new_idx > end_idx:
+            new_idx = start_idx
+        new_filter["currentQuarterIndex"] = new_idx
+
+    # 6) If a map selection changed => update selected hexes
+    if any(t in triggered_ids for t in ["map-quarterly", "map-aggregated"]):
+        # If Clear Hexes is also triggered at the same time, handle that below,
+        # but normally do the selection logic:
+        # (Similar logic as your old update_selected_hexes callback)
+
+        qtr_trigger = ("map-quarterly" in triggered_ids)
+        agg_trigger = ("map-aggregated" in triggered_ids)
+
+        # If the user triggered the quarterly map:
+        if qtr_trigger and qtr_sel is not None and "points" in qtr_sel:
+            idx_list = [pt["pointIndex"] for pt in qtr_sel["points"]]
+            # current quarter's data
+            cur_q_idx = new_filter.get("currentQuarterIndex", 0)
+            quarter_label = quarters[cur_q_idx]
+            df_all = permit_counts_wide.loc[permit_counts_wide["period"] == quarter_label].copy()
+            df_plot = df_all.sort_values("h3_index").reset_index(drop=True)
+            selected_hexes = df_plot.loc[idx_list, "h3_index"].tolist()
+
+            new_filter["selectedIndicesQuarterly"] = idx_list
+            new_filter["selectedHexes"] = selected_hexes
+
+            # also compute matching aggregated indices
+            start_idx = new_filter.get("startQuarterIndex", 0)
+            end_idx   = new_filter.get("endQuarterIndex", len(quarters)-1)
+            s_label   = quarters[start_idx]
+            e_label   = quarters[end_idx]
+            df_sub = permit_counts_wide[
+                (permit_counts_wide["period"] >= s_label) &
+                (permit_counts_wide["period"] <= e_label)
+            ].copy()
+            df_agg = df_sub.groupby("h3_index", as_index=False)[new_filter["permitType"]].sum()
+            df_agg = df_agg.sort_values("h3_index").reset_index(drop=True)
+            matched_indices = df_agg[df_agg["h3_index"].isin(selected_hexes)].index.tolist()
+            new_filter["selectedIndicesAggregated"] = matched_indices
+
+        # If the user triggered the aggregated map:
+        if agg_trigger and agg_sel is not None and "points" in agg_sel:
+            idx_list = [pt["pointIndex"] for pt in agg_sel["points"]]
+            start_idx = new_filter.get("startQuarterIndex", 0)
+            end_idx   = new_filter.get("endQuarterIndex", len(quarters)-1)
+            s_label   = quarters[start_idx]
+            e_label   = quarters[end_idx]
+            df_sub = permit_counts_wide[
+                (permit_counts_wide["period"] >= s_label) &
+                (permit_counts_wide["period"] <= e_label)
+            ].copy()
+            df_agg = df_sub.groupby("h3_index", as_index=False)[new_filter["permitType"]].sum()
+            df_agg = df_agg.sort_values("h3_index").reset_index(drop=True)
+            selected_hexes = df_agg.loc[idx_list, "h3_index"].tolist()
+
+            new_filter["selectedIndicesAggregated"] = idx_list
+            new_filter["selectedHexes"] = selected_hexes
+
+            # compute matching quarterly indices
+            cur_q_idx = new_filter.get("currentQuarterIndex", 0)
+            quarter_label = quarters[cur_q_idx]
+            df_all = permit_counts_wide.loc[permit_counts_wide["period"] == quarter_label].copy()
+            df_plot = df_all.sort_values("h3_index").reset_index(drop=True)
+            matched_indices = df_plot[df_plot["h3_index"].isin(selected_hexes)].index.tolist()
+            new_filter["selectedIndicesQuarterly"] = matched_indices
+
+        # If the user cleared selection by clicking outside => those events come with no "points"
+        # or we do the old logic from update_selected_hexes. (Optional if needed.)
+
+    # 7) If user clicked “Clear Hexes”
+    if "clear-hexes" in triggered_ids:
+        new_filter["selectedIndicesQuarterly"] = None
+        new_filter["selectedIndicesAggregated"] = None
+        new_filter["selectedHexes"] = []
+
+    # 8) If user clicked “Clear Time Range”
+    if "clear-time-range" in triggered_ids:
+        new_filter["startQuarterIndex"] = 0
+        new_filter["endQuarterIndex"]   = len(quarters) - 1
+        # Also clamp currentQuarterIndex
+        new_filter["currentQuarterIndex"] = 0
+
+    return new_filter
 
 
 # ------------------------------------------------------------------------------
-# 4) SPEED DROPDOWN -> UPDATE "speed" FIELD IN GLOBAL_FILTER
-# ------------------------------------------------------------------------------
-@app.callback(
-    Output("global_filter", "data", allow_duplicate=True),
-    Input("speed-dropdown", "value"),
-    State("global_filter", "data"),
-    prevent_initial_call=True
-)
-def update_speed_dropdown(selected_speed, global_filter):
-    logger.info("In callback update_speed_dropdown, final new_filter=%s", global_filter)
-    global_filter["speed"] = selected_speed
-    return global_filter
-
-
-# ------------------------------------------------------------------------------
-# 5) CONTROL THE dcc.Interval (id="animation-interval") BASED ON "play" & "speed"
+# 2) CONTROL THE dcc.Interval (id="animation-interval") BASED ON "play" & "speed"
 # ------------------------------------------------------------------------------
 @app.callback(
     [Output("animation-interval", "disabled"),
@@ -176,34 +255,10 @@ def control_animation_interval(global_filter):
     return (not is_playing, speed)
 
 
-# ------------------------------------------------------------------------------
-# 6) ON TICK OF THE INTERVAL -> ADVANCE currentQuarterIndex IN GLOBAL_FILTER
-# ------------------------------------------------------------------------------
-@app.callback(
-    Output("global_filter", "data", allow_duplicate=True),
-    Input("animation-interval", "n_intervals"),
-    State("global_filter", "data"),
-    prevent_initial_call=True
-)
-def advance_current_quarter(n_intervals, global_filter):
-    logger.info("In callback advance_current_quarter, final new_filter=%s", global_filter)
-    # Read the current quarter index and the start/end
-    current_idx = global_filter.get("currentQuarterIndex", 0)
-    start_idx   = global_filter.get("startQuarterIndex", 0)
-    end_idx     = global_filter.get("endQuarterIndex", len(quarters) - 1)
-
-    # Increment by 1
-    new_idx = current_idx + 1
-    if new_idx > end_idx:
-        # wrap around to start_idx if you like
-        new_idx = start_idx
-
-    global_filter["currentQuarterIndex"] = new_idx
-    return global_filter
 
 
 # ------------------------------------------------------------------------------
-# 7) UPDATE THE QUARTERLY MAP (id="map-quarterly") FROM GLOBAL_FILTER
+# 3) UPDATE THE QUARTERLY MAP (id="map-quarterly") FROM GLOBAL_FILTER
 # ------------------------------------------------------------------------------
 from src.data_utils import ensure_all_hexes, global_quarterly_99, all_hexes
 
@@ -233,13 +288,14 @@ def update_quarterly_map(global_filter, map_view):
                 bearing=map_view.get("bearing"),
                 pitch=map_view.get("pitch")
             ),
-            uirevision="synced-maps"
+            uirevision="synced-maps",
+            map_style = MAPBOX_STYLE
         )
     return fig
 
 
 # ------------------------------------------------------------------------------
-# 8) UPDATE THE AGGREGATED MAP (id="map-aggregated") FROM GLOBAL_FILTER
+# 4) UPDATE THE AGGREGATED MAP (id="map-aggregated") FROM GLOBAL_FILTER
 # ------------------------------------------------------------------------------
 @app.callback(
     Output("map-aggregated", "figure"),
@@ -279,20 +335,20 @@ def update_aggregated_map(global_filter, map_view):
     # Update map view settings
     if map_view:
         fig.update_layout(
-            mapbox=dict(
-                style=MAPBOX_STYLE,
-                accesstoken=mapbox_token,
+            map=dict(
                 center=map_view.get("center"),
+                zoom=map_view.get("zoom"),
                 bearing=map_view.get("bearing"),
                 pitch=map_view.get("pitch")
             ),
-            uirevision="synced-maps"
+            uirevision="synced-maps",
+            map_style = MAPBOX_STYLE
         )
     return fig
 
 
 # ------------------------------------------------------------------------------
-# 9) OPTIONAL: UPDATE THE TIME-SERIES ITSELF
+# 5) OPTIONAL: UPDATE THE TIME-SERIES ITSELF
 # ------------------------------------------------------------------------------
 @app.callback(
     Output("time-series", "figure"),
@@ -316,69 +372,30 @@ def update_time_series(global_filter):
     agg_ts["quarter_idx"] = agg_ts["period"].map(quarter_to_index)
 
     # 3) Create the time series figure with dark theme
-    selected_range = [start_idx, end_idx] if start_idx != 0 or end_idx != len(quarters) - 1 else None
+    selected_range = [start_idx, end_idx] if (start_idx != 0 or end_idx != len(quarters) - 1) else None
     fig = create_time_series_figure(agg_ts, permit_type, selected_range)
+
+    # 4) Add a vertical dashed line for the current quarter
+    if 0 <= current_idx < len(quarters):
+        current_quarter_label = quarters[current_idx]
+        # If that quarter actually exists in agg_ts['period']:
+        if current_quarter_label in agg_ts["period"].values:
+            # We can find the y-max
+            ymax = agg_ts[permit_type].max() if not agg_ts.empty else 1
+            fig.add_shape(
+                type="line",
+                x0=current_quarter_label,
+                x1=current_quarter_label,
+                y0=0,
+                y1=ymax,
+                line=dict(color="blue", dash="dash", width=2),
+                xref="x",  # match to x-axis
+                yref="y"   # match to y-axis
+            )
 
     return fig
 
 
-
-# ------------------------------------------------------------------------------
-# 10) UPDATE THE SELECTED HEXES
-# ------------------------------------------------------------------------------
-@app.callback(
-    Output("global_filter", "data", allow_duplicate=True),
-    [
-        Input("map-quarterly", "selectedData"),
-        Input("map-aggregated", "selectedData"),
-        Input("clear-hexes", "n_clicks")
-    ],
-    [State("global_filter", "data")],
-    prevent_initial_call=True
-)
-def update_selected_hexes(qtr_sel, agg_sel, clear_n_clicks, global_filter):
-    ctx = dash.callback_context
-    new_filter = dict(global_filter)
-    
-    # Clear selection when the user clicks "Clear Hexes"
-    if ctx.triggered and "clear-hexes" in ctx.triggered[0]["prop_id"]:
-        new_filter["selectedIndicesQuarterly"] = None
-        new_filter["selectedIndicesAggregated"] = None
-        return new_filter
-    
-    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
-    sel_data = qtr_sel if trigger == "map-quarterly" else agg_sel
-    
-    if sel_data and "points" in sel_data:
-        # pointIndex is the row index in the sorted DataFrame (i.e. the "point")
-        idx_list = [pt["pointIndex"] for pt in sel_data["points"]]
-        if trigger == "map-quarterly":
-            new_filter["selectedIndicesQuarterly"] = idx_list
-        else:
-            new_filter["selectedIndicesAggregated"] = idx_list
-    else:
-        if trigger == "map-quarterly":
-            new_filter["selectedIndicesQuarterly"] = None
-        else:
-            new_filter["selectedIndicesAggregated"] = None
-    
-    return new_filter
-
-@app.callback(
-    Output("global_filter", "data", allow_duplicate=True),
-    Input("map-aggregated", "figure"),
-    Input("map-quarterly", "figure"),
-    State("global_filter", "data"),
-    prevent_initial_call=True
-)
-def clear_reset_flag(_, __, global_filter):
-    """Resets the resetMaps flag after maps have updated"""
-    logger.info("In callback clear_reset_flag, final new_filter=%s", global_filter)
-    if global_filter.get("resetMaps", False):
-        new_filter = dict(global_filter)
-        new_filter["resetMaps"] = False
-        return new_filter
-    return dash.no_update
 
 @app.callback(
     [Output("map-quarterly-title", "children"),
@@ -397,7 +414,7 @@ def update_titles(global_filter):
     
     # Compute the titles for each section
     quarterly_title = f"{permit_label} Permits Issued Across Space and Time"
-    aggregated_title = f"{permit_label} Permits Issued from {start_label} - {end_label} (select hexes here)"
+    aggregated_title = f"{permit_label} Permits Issued from {start_label} - {end_label}"
     time_series_title = f"Time-Series of {permit_label}"
     
     return quarterly_title, aggregated_title, time_series_title
@@ -506,11 +523,10 @@ def build_single_choropleth_map(df_plot, permit_type, map_title):
         uirevision="constant",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        mapbox=dict(
-            style=MAPBOX_STYLE,
-            accesstoken=mapbox_token,
+        map=dict(
             center={"lat": 40.7, "lon": -73.9},
             zoom=9
-        )
+        ),
+        map_style = MAPBOX_STYLE
     )
     return fig
