@@ -5,6 +5,7 @@ from dash import dcc, html
 from src.config import ANIMATION_INTERVAL
 from src.data_utils import quarters, permit_options
 from src.debug import debug_div
+import dash_core_components as dcc  # ensure dcc is imported if not already
 
 layout = dbc.Container(
     fluid=True,
@@ -42,40 +43,87 @@ layout = dbc.Container(
                 html.Div([
                     html.H4("Controls", style={'color': 'rgba(255, 255, 255, 0.8)'}),
                     html.Hr(style={'borderColor': 'rgba(255, 255, 255, 0.2)'}),
+
+                    # First row: Permit Type and Animation Speed
                     dbc.Row([
-                        dbc.Col(
-                            html.Div([
-                                html.Label("Permit Type", style={'color': 'rgba(255, 255, 255, 0.7)'}),
-                                dcc.RadioItems(
-                                    id="permit-type",
-                                    options=permit_options,
-                                    value="NB",
-                                    className="mb-3",
-                                    style={'color': 'rgba(255, 255, 255, 0.7)'},
-                                    labelStyle={'marginRight': '10px'}
-                                )
-                            ]),
-                            width=6
-                        ),
-                        dbc.Col(
-                            html.Div([
-                                html.Label("Animation Speed", style={'color': 'rgba(255, 255, 255, 0.7)'}),
-                                dcc.RadioItems(
-                                    id="speed-radio",
-                                    options=[
-                                        {"label": "Slow", "value": 2000},
-                                        {"label": "Medium", "value": 1000},
-                                        {"label": "Fast", "value": 500}
-                                    ],
-                                    value=1000,
-                                    className="mb-3",
-                                    style={'color': 'rgba(255, 255, 255, 0.7)'},
-                                    labelStyle={'marginRight': '10px'}
-                                )
-                            ]),
-                            width=6
-                        )
+                        dbc.Col([
+                            html.Label("Permit Type", style={'color': 'rgba(255, 255, 255, 0.7)'}),
+                            dcc.RadioItems(
+                                id="permit-type",
+                                options=permit_options,
+                                value="NB",
+                                className="mb-3",
+                                style={'color': 'rgba(255, 255, 255, 0.7)'},
+                                labelStyle={'marginRight': '10px'}
+                            )
+                        ], width=6),
+                        dbc.Col([
+                            html.Label("Animation Speed", style={'color': 'rgba(255, 255, 255, 0.7)'}),
+                            dcc.RadioItems(
+                                id="speed-radio",
+                                options=[
+                                    {"label": "Slow", "value": 2000},
+                                    {"label": "Medium", "value": 1000},
+                                    {"label": "Fast", "value": 500}
+                                ],
+                                value=1000,
+                                className="mb-3",
+                                style={'color': 'rgba(255, 255, 255, 0.7)'},
+                                labelStyle={'marginRight': '10px'}
+                            )
+                        ], width=6)
                     ], className="mb-3"),
+
+                    # Second row: Aggregated Map Scale and Quarterly Map Scale (aligned vertically)
+                    dbc.Row([
+                        dbc.Col([
+                            html.Label("Aggregated Map Scale", style={'color': 'rgba(255, 255, 255, 0.7)'}),
+                            dcc.Dropdown(
+                                id='scale-type-aggregated',
+                                options=[
+                                    {'label': 'Linear', 'value': 'linear'},
+                                    {'label': 'Ln', 'value': 'ln'},
+                                    {'label': 'Log', 'value': 'log'},
+                                    {'label': 'sqrt', 'value': 'sqrt'},
+                                    {'label': 'cube-root', 'value': 'cube-root'},
+                                    {'label': '4th root', 'value': '4th-root'},
+                                    {'label': '5th-root', 'value': '5th-root'},
+                                    {'label': '6th root', 'value': '6th-root'},
+                                ],
+                                value='4th-root',
+                                className='dark-dropdown',
+                                style={
+                                    'width': '100%', 
+                                    'marginBottom': '10px',
+                                    'color': 'black'
+                                }
+                            )
+                        ], width=6),
+                        dbc.Col([
+                            html.Label("Quarterly Map Scale", style={'color': 'rgba(255, 255, 255, 0.7)'}),
+                            dcc.Dropdown(
+                                id='scale-type-quarterly',
+                                options=[
+                                    {'label': 'Linear', 'value': 'linear'},
+                                    {'label': 'Ln', 'value': 'ln'},
+                                    {'label': 'Log', 'value': 'log'},
+                                    {'label': 'sqrt', 'value': 'sqrt'},
+                                    {'label': 'cube-root', 'value': 'cube-root'},
+                                    {'label': '4th root', 'value': '4th-root'},
+                                    {'label': '5th-root', 'value': '5th-root'},
+                                    {'label': '6th root', 'value': '6th-root'},
+                                ],
+                                value='6th-root',
+                                clearable=False,
+                                style={
+                                    'marginBottom': '10px', 
+                                    'width': '100%',
+                                    'color': 'black'
+                                }
+                            )
+                        ], width=6)
+                    ]),
+
                     html.Label("Select Time Range:", style={'color': 'rgba(255, 255, 255, 0.7)'}),
                     dcc.RangeSlider(
                         id="period-range-slider",
@@ -103,21 +151,21 @@ layout = dbc.Container(
                             className="me-2"
                         ),
                         dbc.Button([
-                            html.I(className="fas fa-clock me-1"),
-                            "Clear Time Range"
+                            html.I(className="fas fa-clock me-1", style={"color": "black"}),
+                            html.Span("Clear Time Range", style={"color": "black"})
                         ], 
                             id="clear-time-range", 
                             color="secondary",
                             className="me-2"
                         ),
                         dbc.Button([
-                            html.I(className="fas fa-eraser me-1"),
-                            "Clear Hexes"
+                            html.I(className="fas fa-eraser me-1", style={"color": "black"}),
+                            html.Span("Clear Hexes", style={"color": "black"})
                         ], 
                             id="clear-hexes", 
-                            color="danger",
+                            color="danger"
                         ),
-                    ], className="d-flex justify-content-start gap-2 mb-3")
+                    ], className="d-flex justify-content-start gap-2 mb-3"),
                 ], style={
                     'backgroundColor': 'rgb(15, 15, 15)',
                     'borderRadius': '5px',

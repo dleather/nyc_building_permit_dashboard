@@ -6,12 +6,22 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "asgiref>=3.8.1",
-    "dash>=2.18.2",
+    "dash[testing]>=2.18.2",
     "dash-bootstrap-components>=1.7.1",
     "geopandas>=1.0.1",
     "pandas>=2.2.3",
     "plotly>=6.0.0",
+    "pytest>=8.3.4",
+    "pytest-cov>=6.0.0",
     "python-dotenv>=1.0.1",
     "shapely>=2.0.7",
     "uvicorn>=0.34.0",
+    "webdriver-manager>=4.0.2",
+    "pytest-html>=4.1.1",
 ]
+
+[tool.pytest.plugins]
+pytest_plugins = ["dash.testing.browser"]
+
+[tool.pytest.patch]
+"dash.testing.browser.Browser._get_chrome" = "conftest.patched_get_chrome"

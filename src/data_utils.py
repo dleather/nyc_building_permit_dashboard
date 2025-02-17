@@ -108,8 +108,8 @@ def ensure_all_hexes(df, permit_type):
     df = df.set_index("h3_index")
     # Reindex to *all* hexes
     df = df.reindex(all_hexes)
-    # Fill missing count with 0
-    df[permit_type] = df[permit_type].fillna(0)
+    # Fill missing count with 0, converting values to int
+    df[permit_type] = df[permit_type].fillna(0).astype(int)
     # Move h3_index back to a column
     df.reset_index(inplace=True)
     df.rename(columns={"index": "h3_index"}, inplace=True)
@@ -138,210 +138,223 @@ def get_subrange_singlequarter_99(permit_type: str, start_label: str, end_label:
 
 def build_log_ticks(new_cmax):
     """
-    Build a list of ticks (in log-space) from 0 up to new_cmax,
-    including integer steps and always including the min (0) and max value.
-
-    Returns (tick_vals, tick_text) for coloraxis ticks.
-    Example:
-       new_cmax = 3.5 -> tick_vals=[0,1,2,3,3.5], tick_text=['1','10','100','1000','3162']
+    Build a list of ticks in log-space with improved spacing.
     """
     if new_cmax <= 0:
-        return [0], ["1"]
-
-    # integer part
-    floor_val = int(math.floor(new_cmax))  # e.g. 3 if cmax=3.5
-    tick_vals = list(range(floor_val + 1)) # [0,1,2,3]
-
-    # Always include the max value if it's not already included
-    if new_cmax > floor_val:
-        max_val = round(new_cmax, 2)
-        if max_val not in tick_vals:
-            tick_vals.append(max_val)
-
-    # Generate tick text for all values
-    tick_text = [f"{int(10**v) if v.is_integer() else 10**v:.0f}" for v in tick_vals]
+        return [0], ["0"]
+    
+    # Create breaks at 1, 10, 100, etc. up to the max
+    max_power = math.ceil(math.log10(new_cmax))
+    tick_vals = [0] + [10**i for i in range(max_power)]
+    
+    # Add the actual maximum if it's not already included
+    if new_cmax not in tick_vals:
+        tick_vals.append(new_cmax)
+    
+    # Format tick labels
+    tick_text = ["0"] + [f"{int(v):,}" if v < 1000 else f"{v:.0e}" for v in tick_vals[1:]]
+    
     return tick_vals, tick_text
 
-def should_use_log_scale(values, threshold=100):
+def should_use_log_scale(values, threshold=50):
     """
     Determine if a log scale would be appropriate based on data distribution.
-    Returns True if the 99th percentile of the data is greater than 100.
+    Returns True if data is highly skewed and spans multiple orders of magnitude.
     """
     non_zero = values[values > 0]
-    if len(non_zero) < 2:  # Need at least 2 points for meaningful comparison
+    if len(non_zero) < 2:
         return False
-        
-    # Calculate 99th percentile
+    
     p99 = np.percentile(non_zero, 99)
-    return p99 > 100
+    p50 = np.percentile(non_zero, 50)
+    
+    # Use log scale if:
+    # 1. 99th percentile is > threshold AND
+    # 2. Ratio between p99 and median is large (indicates skew)
+    return bool(p99 > threshold and (p99 / p50) > 5)  # Lowered ratio threshold from 10 to 5
 
 def get_colorscale_params(values, use_log=False):
     """
-    Get appropriate colorscale parameters based on the data and scale type.
-    Returns tuple of (zmin, zmax, colorscale_name, colorbar_title_suffix)
+    Get appropriate colorscale parameters based on the data distribution.
+    Returns tuple of (zmin, zmax, colorscale, colorbar_title_suffix)
     """
-    # Create custom colorscale that goes from light blue to red
+    # Avoid calling np.percentile on an empty list/array
+    if len(values) == 0:
+        return 0, 1, px.colors.sequential.Blues, ""
+    # Otherwise, continue with normal processing
+    zmax = np.percentile(values, 99)  # Use 99th percentile to avoid outliers
+    
+    # Create custom colorscale with better separation in lower ranges
     custom_colorscale = [
-        [0, 'rgba(50,50,70,0.6)'],      # Dark blue-gray for bottom 5%
-        [0.05, 'rgba(100,100,150,0.7)'], # Slightly lighter blue for 5%
-        [0.2, 'rgba(200,150,150,0.7)'],  # Muted rose color
-        [0.4, 'rgba(255,150,150,0.8)'],  # Light red with more opacity
-        [0.6, 'rgba(255,100,100,0.9)'],  # Medium red
-        [0.8, 'rgba(255,50,50,0.95)'],   # Brighter red
-        [1, 'rgba(255,0,0,1)']           # Pure red for highest values
+        [0, 'rgba(240,240,240,0.8)'],    # Very light gray for zeros
+        [0.1, 'rgba(215,225,240,0.85)'],  # Light blue-gray
+        [0.25, 'rgba(190,210,235,0.9)'],  # Slightly darker blue
+        [0.4, 'rgba(220,180,180,0.9)'],   # Light rose
+        [0.6, 'rgba(230,150,150,0.92)'],  # Medium rose-red
+        [0.8, 'rgba(240,100,100,0.95)'],  # Strong red
+        [0.9, 'rgba(250,50,50,0.97)'],    # Very strong red
+        [1, 'rgba(255,0,0,1)']            # Pure red
     ]
     
     if use_log:
-        non_zero = values[values > 0]
-        if len(non_zero) == 0:
-            return 0, 1, custom_colorscale, " (log scale)"
-            
-        zmin = max(0.1, non_zero.min())  # Avoid log(0)
-        zmax = non_zero.max()
+        # Use 1st percentile as minimum to avoid extreme small values
+        zmin = max(0.1, np.percentile(values, 1))
         return zmin, zmax, custom_colorscale, " (log scale)"
     else:
-        return values.min(), values.max(), custom_colorscale, ""
-
-def build_two_trace_mapbox(
-    df_base,
-    df_top,
-    permit_type,
-    cmin_base,
-    cmax_base,
-    cmin_top,
-    cmax_top,
-    selecting=False,
-    show_all_if_empty=True,
-    map_title="",
-    use_log_base=False,
-    use_log_top=False
-):
-    import plotly.graph_objects as go
-    
-    # Use provided log scale parameters
-    base_values = df_base[permit_type]
-    top_values = df_top[permit_type]
-    #logger.info(f"base_values min, max: {base_values.min()}, {base_values.max()}")
-    #logger.info(f"top_values min, max: {top_values.min()}, {top_values.max()}")
-    
-    #logger.info(f"Using log base: {use_log_base} (provided)")
-    #logger.info(f"Using log top: {use_log_top} (provided)")
-    
-    # Determine if we should use the same color scale for both layers
-    use_same_scale = df_base.equals(df_top)
-    
-    # Get colorscale parameters for base layer
-    if use_log_base:
-        zmin_base, zmax_base, cs_base, suffix_base = get_colorscale_params(base_values, True)
-    else:
-        # Use provided linear scale bounds
-        zmin_base, zmax_base = cmin_base, cmax_base
-        cs_base = get_colorscale_params(base_values, False)[2]  # Just get colorscale
-        suffix_base = ""
-    
-    # Base trace with potential log scale
-    base_trace = go.Choroplethmapbox(
-        geojson=hex_geojson,
-        featureidkey="properties.h3_index",
-        locations=df_base["h3_index"],
-        z=df_base[permit_type],
-        zmin=zmin_base,
-        zmax=zmax_base,
-        colorscale=cs_base,
-        marker_opacity=0.75,
-        marker_line_width=1.5,
-        marker_line_color='rgba(255, 255, 255, 0.3)',
-        showscale=False,
-        hoverinfo="skip",
-        name="Base"
-    )
-    
-    if use_log_base:
-        base_trace.update(
-            colorbar_title=f"Count{suffix_base}",
-            colorbar_tickformat=".1e"
-        )
+        # For linear scale, use robust min/max
+        zmin = values.min()
         
-    # Get colorscale parameters for top layer
-    if use_same_scale:
-        # Use the same parameters as the base layer
-        zmin_top, zmax_top = zmin_base, zmax_base
-        cs_top = cs_base
-        suffix_top = suffix_base
-    elif use_log_top:
-        zmin_top, zmax_top, cs_top, suffix_top = get_colorscale_params(top_values, True)
-    else:
-        # Use provided linear scale bounds
-        zmin_top, zmax_top = cmin_top, cmax_top
-        cs_top = get_colorscale_params(top_values, False)[2]  # Just get colorscale
-        suffix_top = ""
+        # If we have a lot of zeros, adjust the scale to give more resolution to non-zero values
+        if (values == 0).sum() / len(values) > 0.5:  # If more than 50% zeros
+            non_zero = values[values > 0]
+            if len(non_zero) > 0:
+                zmin = non_zero.min() * 0.9  # Slight buffer below minimum non-zero value
+        
+        return zmin, zmax, custom_colorscale, ""
+
+# def build_two_trace_mapbox(
+#     df_base,
+#     df_top,
+#     permit_type,
+#     cmin_base,
+#     cmax_base,
+#     cmin_top,
+#     cmax_top,
+#     selecting=False,
+#     show_all_if_empty=True,
+#     map_title="",
+#     use_log_base=None,  # Changed to None to allow auto-detection
+#     use_log_top=None    # Changed to None to allow auto-detection
+# ):
+#     import plotly.graph_objects as go
     
-    # Top trace with potential log scale
-    top_trace = go.Choroplethmapbox(
-        geojson=hex_geojson,
-        featureidkey="properties.h3_index",
-        locations=df_top["h3_index"],
-        z=df_top[permit_type],
-        zmin=zmin_top,
-        zmax=zmax_top,
-        colorscale=cs_top,
-        marker_opacity=1,
-        marker_line_width=2,
-        marker_line_color='rgba(255, 255, 255, 0.8)',
-        showscale=True,
-        name="Selected",
-        hoverinfo="location+z",
-        colorbar_title=f"Count{suffix_top}"
-    )
+#     # Get values and determine if log scale should be used
+#     base_values = df_base[permit_type]
+#     top_values = df_top[permit_type]
     
-    if use_log_top:
-        top_trace.update(colorbar_tickformat=".1e")
+#     # Auto-detect log scale if not explicitly provided
+#     if use_log_base is None:
+#         use_log_base = should_use_log_scale(base_values)
+#     if use_log_top is None:
+#         use_log_top = should_use_log_scale(top_values)
+    
+#     # Determine if we should use the same color scale for both layers
+#     use_same_scale = df_base.equals(df_top)
+    
+#     # Get colorscale parameters for base layer
+#     if use_log_base:
+#         zmin_base, zmax_base, cs_base, suffix_base = get_colorscale_params(base_values, True)
+#         tick_vals, tick_text = build_log_ticks(math.log10(zmax_base))
+#     else:
+#         # Use robust scaling even with provided bounds
+#         zmin_base = min(cmin_base, base_values.min())
+#         zmax_base = min(cmax_base, np.percentile(base_values, 99))
+#         _, _, cs_base, suffix_base = get_colorscale_params(base_values, False)
+    
+#     # Base trace with potential log scale
+#     base_trace = go.Choroplethmapbox(
+#         geojson=hex_geojson,
+#         featureidkey="properties.h3_index",
+#         locations=df_base["h3_index"],
+#         z=df_base[permit_type],
+#         zmin=zmin_base,
+#         zmax=zmax_base,
+#         colorscale=cs_base,
+#         marker_opacity=0.75,
+#         marker_line_width=1.5,
+#         marker_line_color='rgba(255, 255, 255, 0.3)',
+#         showscale=False,
+#         hoverinfo="skip",
+#         name="Base"
+#     )
+    
+#     if use_log_base:
+#         base_trace.update(
+#             colorbar=dict(
+#                 title=f"Count{suffix_base}",
+#                 ticktext=tick_text,
+#                 tickvals=tick_vals,
+#                 tickformat=".1e"
+#             )
+#         )
+        
+#     # Get colorscale parameters for top layer
+#     if use_same_scale:
+#         # Use the same parameters as the base layer
+#         zmin_top, zmax_top = zmin_base, zmax_base
+#         cs_top = cs_base
+#         suffix_top = suffix_base
+#         tick_vals_top, tick_text_top = tick_vals, tick_text if use_log_base else (None, None)
+#     elif use_log_top:
+#         zmin_top, zmax_top, cs_top, suffix_top = get_colorscale_params(top_values, True)
+#         tick_vals_top, tick_text_top = build_log_ticks(math.log10(zmax_top))
+#     else:
+#         # Use robust scaling even with provided bounds
+#         zmin_top = min(cmin_top, top_values.min())
+#         zmax_top = min(cmax_top, np.percentile(top_values, 99))
+#         _, _, cs_top, suffix_top = get_colorscale_params(top_values, False)
+#         tick_vals_top, tick_text_top = None, None
+    
+#     # Top trace with potential log scale
+#     top_trace = go.Choroplethmapbox(
+#         geojson=hex_geojson,
+#         featureidkey="properties.h3_index",
+#         locations=df_top["h3_index"],
+#         z=df_top[permit_type],
+#         zmin=zmin_top,
+#         zmax=zmax_top,
+#         colorscale=cs_top,
+#         marker_opacity=1,
+#         marker_line_width=2,
+#         marker_line_color='rgba(255, 255, 255, 0.8)',
+#         showscale=True,
+#         name="Selected",
+#         hoverinfo="location+z",
+#         colorbar_title=f"Count{suffix_top}"
+#     )
+    
+#     if use_log_top:
+#         top_trace.update(
+#             colorbar=dict(
+#                 title=f"Count{suffix_top}",
+#                 ticktext=tick_text_top,
+#                 tickvals=tick_vals_top,
+#                 tickformat=".1e"
+#             )
+#         )
 
-    fig = go.Figure([base_trace, top_trace])
-    fig.update_layout(
-        title=dict(
-            text=map_title, 
-            x=0.5,
-            font=dict(color='rgba(255, 255, 255, 0.9)'),
-            # Remove any background color by not setting it
-        ),
-        mapbox=dict(
-            style="carto-positron",
-            center={"lat": 40.7, "lon": -73.9},
-            zoom=9
-        ),
-        margin=dict(r=0, t=30, l=0, b=0),
-        dragmode="select",
-        uirevision="constant",
-        # Add paper and plot background colors
-        paper_bgcolor='rgba(0,0,0,0)',  # Transparent background
-        plot_bgcolor='rgba(0,0,0,0)'    # Transparent background
-    )
+#     fig = go.Figure([base_trace, top_trace])
+#     fig.update_layout(
+#         title=dict(
+#             text=map_title, 
+#             x=0.5,
+#             font=dict(color='rgba(255, 255, 255, 0.9)')
+#         ),
+#         mapbox=dict(
+#             style="carto-positron",
+#             center={"lat": 40.7, "lon": -73.9},
+#             zoom=9
+#         ),
+#         margin=dict(r=0, t=30, l=0, b=0),
+#         dragmode="select",
+#         uirevision="constant",
+#         paper_bgcolor='rgba(0,0,0,0)',
+#         plot_bgcolor='rgba(0,0,0,0)'
+#     )
 
-    # Update colorbar styling for both traces
-    base_trace.update(
-        colorbar=dict(
-            title=dict(
-                text=f"Count{suffix_base}",
-                font=dict(color='rgba(255, 255, 255, 0.9)')
-            ),
-            tickfont=dict(color='rgba(255, 255, 255, 0.9)'),  # This makes the numbers white
-            bgcolor='rgba(0,0,0,0)'  # Transparent background
-        )
-    )
+#     # Update colorbar styling for both traces
+#     for trace in [base_trace, top_trace]:
+#         trace.update(
+#             colorbar=dict(
+#                 title=dict(
+#                     font=dict(color='rgba(255, 255, 255, 0.9)')
+#                 ),
+#                 tickfont=dict(color='rgba(255, 255, 255, 0.9)'),
+#                 bgcolor='rgba(0,0,0,0)'
+#             )
+#         )
 
-    top_trace.update(
-        colorbar=dict(
-            title=dict(
-                text=f"Count{suffix_top}",
-                font=dict(color='rgba(255, 255, 255, 0.9)')
-            ),
-            tickfont=dict(color='rgba(255, 255, 255, 0.9)'),  # This makes the numbers white
-            bgcolor='rgba(0,0,0,0)'  # Transparent background
-        )
-    )
-
-    return fig
+#     return fig
 
 def get_global_max_for_permit_type(permit_type, start_idx=None, end_idx=None):
     """
@@ -442,3 +455,13 @@ __all__ = [
     "permit_options", "permit_type_list", "global_color_scales", "global_quarterly_99",
     "global_agg_99", "ensure_all_hexes"
 ]
+
+# Add this to data_utils.py
+DEFAULT_SCALES = {
+    "NB": {"aggregated": "4th-root", "quarterly": "6th-root"},
+    "DM": {"aggregated": "cube-root", "quarterly": "6th-root"},
+    "A1": {"aggregated": "4th-root", "quarterly": "6th-root"},
+    "A2": {"aggregated": "4th-root", "quarterly": "6th-root"},
+    "A3": {"aggregated": "4th-root", "quarterly": "5th-root"},
+    "total_permit_count": {"aggregated": "5th-root", "quarterly": "6th-root"}
+}
