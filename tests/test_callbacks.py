@@ -92,7 +92,7 @@ def test_aggregator_callback(monkeypatch):
     }
 
     # Call the aggregator callback
-    new_filter = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value,
         permit_value,
         play_clicks,
@@ -103,13 +103,15 @@ def test_aggregator_callback(monkeypatch):
         agg_sel,
         clear_hexes_clicks,
         clear_time_clicks,
-        global_filter
+        global_filter,
+        "linear",   # current_agg_scale
+        "linear"    # current_qtr_scale
     )
 
     # Perform assertions
-    assert new_filter["startQuarterIndex"] == slider_value[0]
-    assert new_filter["endQuarterIndex"] == slider_value[1]
-    assert new_filter["permitType"] == permit_value
+    assert global_filter_result["startQuarterIndex"] == slider_value[0]
+    assert global_filter_result["endQuarterIndex"] == slider_value[1]
+    assert global_filter_result["permitType"] == permit_value
 
 def test_debug_map_selections():
     """Test the debug_map_selections callback functionality"""
@@ -202,7 +204,7 @@ def test_slider_change(monkeypatch, initial_filter, aggregated_data):
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
 
     slider_value = [1, 2]  # new start and end indices
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value,
         permit_value=None,
         play_clicks=None,
@@ -213,12 +215,14 @@ def test_slider_change(monkeypatch, initial_filter, aggregated_data):
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
-    assert result["startQuarterIndex"] == 1
-    assert result["endQuarterIndex"] == 2
+    assert global_filter_result["startQuarterIndex"] == 1
+    assert global_filter_result["endQuarterIndex"] == 2
     # currentQuarterIndex is already 1 and within [1,2]
-    assert result["currentQuarterIndex"] == 1
+    assert global_filter_result["currentQuarterIndex"] == 1
 
 # 1a) Test slider change when the currentQuarterIndex falls outside the new slider range
 def test_slider_change_current_clamp(monkeypatch, initial_filter, aggregated_data):
@@ -226,7 +230,7 @@ def test_slider_change_current_clamp(monkeypatch, initial_filter, aggregated_dat
     dummy_ctx = DummyCallbackContext(triggered=[{"prop_id": "period-range-slider.value"}])
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
     slider_value = [1, 2]
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value,
         permit_value=None,
         play_clicks=None,
@@ -237,19 +241,21 @@ def test_slider_change_current_clamp(monkeypatch, initial_filter, aggregated_dat
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
     # currentQuarterIndex should now be clamped to the start value, 1
-    assert result["startQuarterIndex"] == 1
-    assert result["endQuarterIndex"] == 2
-    assert result["currentQuarterIndex"] == 1
+    assert global_filter_result["startQuarterIndex"] == 1
+    assert global_filter_result["endQuarterIndex"] == 2
+    assert global_filter_result["currentQuarterIndex"] == 1
 
 # 2) Test permit type change
 def test_permit_type_change(monkeypatch, initial_filter, aggregated_data):
     dummy_ctx = DummyCallbackContext(triggered=[{"prop_id": "permit-type.value"}])
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
     permit_value = "DM"  # Change permit type from "NB" to "DM"
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=permit_value,
         play_clicks=None,
@@ -260,15 +266,17 @@ def test_permit_type_change(monkeypatch, initial_filter, aggregated_data):
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
-    assert result["permitType"] == "DM"
+    assert global_filter_result["permitType"] == "DM"
 
 # 3) Test play-button trigger: sets "play" to True
 def test_play_button(monkeypatch, initial_filter, aggregated_data):
     dummy_ctx = DummyCallbackContext(triggered=[{"prop_id": "play-button.n_clicks"}])
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=None,
         play_clicks=1,
@@ -279,15 +287,17 @@ def test_play_button(monkeypatch, initial_filter, aggregated_data):
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
-    assert result["play"] is True
+    assert global_filter_result["play"] is True
 
 # 4) Test pause-button trigger: sets "play" to False
 def test_pause_button(monkeypatch, initial_filter, aggregated_data):
     dummy_ctx = DummyCallbackContext(triggered=[{"prop_id": "pause-button.n_clicks"}])
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=None,
         play_clicks=None,
@@ -298,16 +308,18 @@ def test_pause_button(monkeypatch, initial_filter, aggregated_data):
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
-    assert result["play"] is False
+    assert global_filter_result["play"] is False
 
 # 5) Test speed change trigger: updates global_filter["speed"]
 def test_speed_change(monkeypatch, initial_filter, aggregated_data):
     dummy_ctx = DummyCallbackContext(triggered=[{"prop_id": "speed-radio.value"}])
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
     speed_value = 2000
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=None,
         play_clicks=None,
@@ -318,9 +330,11 @@ def test_speed_change(monkeypatch, initial_filter, aggregated_data):
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
-    assert result["speed"] == speed_value
+    assert global_filter_result["speed"] == speed_value
 
 # 6) Test animation interval tick: advancing the current quarter with wrapping
 def test_animation_interval(monkeypatch, initial_filter, aggregated_data):
@@ -329,7 +343,7 @@ def test_animation_interval(monkeypatch, initial_filter, aggregated_data):
     initial_filter["currentQuarterIndex"] = 2
     dummy_ctx = DummyCallbackContext(triggered=[{"prop_id": "animation-interval.n_intervals"}])
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=None,
         play_clicks=None,
@@ -340,18 +354,20 @@ def test_animation_interval(monkeypatch, initial_filter, aggregated_data):
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
     # Since currentQuarterIndex (2) plus one exceeds endQuarterIndex (2),
     # it should wrap to startQuarterIndex which is 0.
-    assert result["currentQuarterIndex"] == 0
+    assert global_filter_result["currentQuarterIndex"] == 0
 
 # 6a) Test a regular animation tick increment (without wrapping)
 def test_animation_interval_regular(monkeypatch, initial_filter, aggregated_data):
     initial_filter["currentQuarterIndex"] = 1
     dummy_ctx = DummyCallbackContext(triggered=[{"prop_id": "animation-interval.n_intervals"}])
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=None,
         play_clicks=None,
@@ -362,10 +378,12 @@ def test_animation_interval_regular(monkeypatch, initial_filter, aggregated_data
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
     # currentQuarterIndex should increment by 1, from 1 to 2
-    assert result["currentQuarterIndex"] == 2
+    assert global_filter_result["currentQuarterIndex"] == 2
 
 # 7) Test map-quarterly selection: update "selectedHexes" based on quarterly map points
 def test_map_quarterly_selection(monkeypatch, initial_filter, quarterly_data):
@@ -376,7 +394,7 @@ def test_map_quarterly_selection(monkeypatch, initial_filter, quarterly_data):
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
     # Simulate selection with one point - pointIndex 1 in the DataFrame sorted by h3_index ["a", "b", "c"]
     qtr_sel = {"points": [{"pointIndex": 1}]}
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=None,
         play_clicks=None,
@@ -387,10 +405,12 @@ def test_map_quarterly_selection(monkeypatch, initial_filter, quarterly_data):
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
     # Expect "b" based on the ordering in the quarterly DataFrame.
-    assert result["selectedHexes"] == ["b"]
+    assert global_filter_result["selectedHexes"] == ["b"]
 
 # 8) Test map-aggregated selection: update "selectedHexes" based on aggregated map points
 def test_map_aggregated_selection(monkeypatch, initial_filter, aggregated_data):
@@ -403,7 +423,7 @@ def test_map_aggregated_selection(monkeypatch, initial_filter, aggregated_data):
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
     # Simulate selection: choose the third point (pointIndex 2)
     agg_sel = {"points": [{"pointIndex": 2}]}
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=None,
         play_clicks=None,
@@ -414,10 +434,12 @@ def test_map_aggregated_selection(monkeypatch, initial_filter, aggregated_data):
         agg_sel=agg_sel,
         clear_hexes_clicks=None,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
     # Grouping produces a sorted order of h3_index: ["a", "b", "c"], so selection returns "c".
-    assert result["selectedHexes"] == ["c"]
+    assert global_filter_result["selectedHexes"] == ["c"]
 
 # 9) Test clear-hexes trigger: resets "selectedHexes" to an empty list
 def test_clear_hexes(monkeypatch, initial_filter, aggregated_data):
@@ -425,7 +447,7 @@ def test_clear_hexes(monkeypatch, initial_filter, aggregated_data):
     monkeypatch.setattr(dash, "callback_context", dummy_ctx)
     # Assume some hexes are already selected
     initial_filter["selectedHexes"] = ["a", "b"]
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=None,
         play_clicks=None,
@@ -436,9 +458,11 @@ def test_clear_hexes(monkeypatch, initial_filter, aggregated_data):
         agg_sel=None,
         clear_hexes_clicks=1,
         clear_time_clicks=None,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
-    assert result["selectedHexes"] == []
+    assert global_filter_result["selectedHexes"] == []
 
 # 10) Test clear-time-range trigger: resets time range and current quarter
 def test_clear_time_range(monkeypatch, initial_filter, aggregated_data):
@@ -449,7 +473,7 @@ def test_clear_time_range(monkeypatch, initial_filter, aggregated_data):
     initial_filter["endQuarterIndex"] = 2
     initial_filter["currentQuarterIndex"] = 2
     quarters, _ = aggregated_data
-    result = aggregator_callback(
+    global_filter_result, agg_scale, qtr_scale = aggregator_callback(
         slider_value=None,
         permit_value=None,
         play_clicks=None,
@@ -460,11 +484,13 @@ def test_clear_time_range(monkeypatch, initial_filter, aggregated_data):
         agg_sel=None,
         clear_hexes_clicks=None,
         clear_time_clicks=1,
-        global_filter=initial_filter
+        global_filter=initial_filter,
+        current_agg_scale="linear",
+        current_qtr_scale="linear"
     )
-    assert result["startQuarterIndex"] == 0
-    assert result["endQuarterIndex"] == len(quarters) - 1
-    assert result["currentQuarterIndex"] == 0
+    assert global_filter_result["startQuarterIndex"] == 0
+    assert global_filter_result["endQuarterIndex"] == len(quarters) - 1
+    assert global_filter_result["currentQuarterIndex"] == 0
 
 # ---------------------------
 # Fixtures for dummy data
@@ -542,12 +568,10 @@ def test_update_quarterly_map_no_mapview(dummy_data_quarterly):
         "endQuarterIndex": len(quarters) - 1
     }
     map_view = None  # No map view override
-    fig = callbacks.update_quarterly_map(global_filter, map_view)
+    fig = callbacks.update_quarterly_map(global_filter, map_view, "linear")
     
-    # Verify that a Plotly Figure is returned
     assert isinstance(fig, go.Figure)
     
-    # Instead of comparing directly (which returns a tuple), convert to list.
     selected_points = None
     for trace in fig.data:
         if hasattr(trace, "selectedpoints") and trace.selectedpoints is not None:
@@ -569,7 +593,7 @@ def test_update_quarterly_map_with_mapview(dummy_data_quarterly):
         "bearing": 10,
         "pitch": 0
     }
-    fig = callbacks.update_quarterly_map(global_filter, map_view)
+    fig = callbacks.update_quarterly_map(global_filter, map_view, "linear")
     layout = fig.layout
     center = layout.mapbox.center
     assert center.lat == map_view["center"]["lat"]
@@ -587,7 +611,7 @@ def test_update_aggregated_map_no_mapview(dummy_data_aggregated):
        "selectedHexes": ["b"]
     }
     map_view = None
-    fig = callbacks.update_aggregated_map(global_filter, map_view)
+    fig = callbacks.update_aggregated_map(global_filter, map_view, "linear")
     assert isinstance(fig, go.Figure)
     
     selected_points = None
@@ -610,7 +634,7 @@ def test_update_aggregated_map_with_mapview(dummy_data_aggregated):
         "bearing": 0,
         "pitch": 5
     }
-    fig = callbacks.update_aggregated_map(global_filter, map_view)
+    fig = callbacks.update_aggregated_map(global_filter, map_view, "linear")
     layout = fig.layout
     center = layout.mapbox.center
     assert center.lat == map_view["center"]["lat"]
@@ -640,7 +664,7 @@ def test_update_time_series_with_current_line(dummy_data_time_series):
     assert line_shape["type"] == "line"
     assert line_shape["x0"] == "Q2"
     assert line_shape["x1"] == "Q2"
-    assert line_shape["line"]["color"] == "blue"
+    assert line_shape["line"]["color"] == "rgba(255, 255, 255, 0.5)"
     assert line_shape["line"]["dash"] == "dash"
 
 # -----------------------------------------------------------------------------
