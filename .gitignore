@@ -14,6 +14,7 @@ dist/
 eggs/
 *.egg-info/
 .eggs/
+*.egg
 
 # Installer logs
 pip-log.txt
@@ -33,7 +34,6 @@ venv/
 ENV/
 env/
 .venv.bak/
-*.egg
 
 # macOS
 .DS_Store
@@ -49,3 +49,21 @@ env/
 # Codeweaver
 codebase.md
 run_codeweaver.bat
+
+# Generated documentation
+readme.html
+
+# Dependency management
+.python-version
+uv.lock
+
+# Dash/Plotly specific
+*.dash.json
+assets/*.map
+
+# Test reports
+test-results/
+pytest-report.html
+
+report.html
+readme.html
