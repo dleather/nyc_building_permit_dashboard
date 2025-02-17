@@ -188,8 +188,12 @@ def aggregator_callback(
             quarter_label = quarters[cur_q_idx]
             df_all = permit_counts_wide.loc[permit_counts_wide["period"] == quarter_label].copy()
             df_plot = df_all.sort_values("h3_index").reset_index(drop=True)
-            selected_hexes = df_plot.loc[idx_list, "h3_index"].tolist()
-            new_filter["selectedHexes"] = selected_hexes
+            if not idx_list:
+                # Show all hexes as selected if empty
+                idx_list = df_plot.index.tolist()
+            else:
+                selected_hexes = df_plot.loc[idx_list, "h3_index"].tolist()
+                new_filter["selectedHexes"] = selected_hexes
 
         # If the user triggered the aggregated map:
         if agg_trigger and agg_sel is not None and "points" in agg_sel:
@@ -204,8 +208,12 @@ def aggregator_callback(
             ].copy()
             df_agg = df_sub.groupby("h3_index", as_index=False)[new_filter["permitType"]].sum()
             df_agg = df_agg.sort_values("h3_index").reset_index(drop=True)
-            selected_hexes = df_agg.loc[idx_list, "h3_index"].tolist()
-            new_filter["selectedHexes"] = selected_hexes
+            if not idx_list:
+                # Show all hexes as selected if empty
+                idx_list = df_agg.index.tolist()
+            else:
+                selected_hexes = df_agg.loc[idx_list, "h3_index"].tolist()
+                new_filter["selectedHexes"] = selected_hexes
 
     # 7) If user clicked "Clear Hexes"
     if "clear-hexes" in triggered_ids:
@@ -285,7 +293,11 @@ def update_quarterly_map(global_filter, map_view, scale_type):
     logger.info(f"Data shape for quarter: {df_plot.shape}")
     
     # Calculate indices for selected hexes
-    selected_idx_list = df_plot[df_plot["h3_index"].isin(selected_hexes)].index.tolist()
+    if not selected_hexes:
+        # Show all hexes as selected if empty
+        selected_idx_list = df_plot.index.tolist()
+    else:
+        selected_idx_list = df_plot[df_plot["h3_index"].isin(selected_hexes)].index.tolist()
     
     # Compute max value for color scale based on current time range
     slider_start = global_filter.get("startQuarterIndex", 0)
@@ -375,7 +387,11 @@ def update_aggregated_map(global_filter, map_view, scale_type):
     logger.info(f"Final zmax value: {aggregated_zmax}")
     
     selected_hexes = global_filter.get("selectedHexes", [])
-    selected_idx_list = df_plot[df_plot["h3_index"].isin(selected_hexes)].index.tolist()
+    if not selected_hexes:
+        # Show all hexes as selected if empty
+        selected_idx_list = df_plot.index.tolist()
+    else:
+        selected_idx_list = df_plot[df_plot["h3_index"].isin(selected_hexes)].index.tolist()
     
     # Map the dropdown scale option into transformation parameters.
     if scale_type in {"sqrt", "cube-root", "4th-root", "5th-root", "6th-root"}:

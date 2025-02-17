@@ -66,7 +66,7 @@ layout = dbc.Container(
                                     {"label": "Medium", "value": 1000},
                                     {"label": "Fast", "value": 500}
                                 ],
-                                value=1000,
+                                value=500,
                                 className="mb-3",
                                 style={'color': 'rgba(255, 255, 255, 0.7)'},
                                 labelStyle={'marginRight': '10px'}
@@ -238,8 +238,8 @@ layout = dbc.Container(
                 "endQuarterIndex": len(quarters) - 1,
                 "currentQuarterIndex": 0,
                 "permitType": "NB",
-                "play": False,
-                "speed": 1000,
+                "play": True,
+                "speed": 500,
                 "selectedHexes": [],
                 "resetMaps": False
             }
