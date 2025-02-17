@@ -82,29 +82,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="nyc-building-permit-dashboard" class="level1">
 <h1>NYC Building Permit Dashboard</h1>
-<p>An interactive data science dashboard for visualizing and analyzing NYC building permit data. This project leverages modern web development and data science techniques to provide dynamic insights into permit issuance over time and across the city’s geospatial landscape.</p>
+<p>An interactive dashboard for exploring and monitoring NYC building permit data. This project harnesses modern web development tools and sophisticated data processing techniques to deliver dynamic insights into permit issuance trends and geographic distributions across New York City.</p>
 <p><a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-%3E=3.13-blue.svg" class="img-fluid" alt="Python Version"></a> <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" class="img-fluid" alt="License: MIT"></a></p>
 <hr>
 <section id="overview" class="level2">
 <h2 class="anchored" data-anchor-id="overview">Overview</h2>
-<p>The <strong>NYC Building Permit Dashboard</strong> is built using <a href="https://dash.plotly.com/">Dash</a> and <a href="https://plotly.com/python/">Plotly</a> to create a responsive, highly interactive web application. It processes geospatial data with <a href="https://geopandas.org/">GeoPandas</a> and performs advanced data manipulation with <a href="https://pandas.pydata.org/">pandas</a>. By combining these powerful tools, the dashboard enables users to:</p>
+<p>The <strong>NYC Building Permit Dashboard</strong> is a responsive web application built with <a href="https://dash.plotly.com/">Dash</a> and <a href="https://plotly.com/python/">Plotly</a>. It converts public building permit records into clean, actionable visualizations using tools such as <a href="https://geopandas.org/">GeoPandas</a> and <a href="https://pandas.pydata.org/">pandas</a>. Whether you’re looking to monitor trend shifts or review spatial distributions, the dashboard makes data exploration straightforward through:</p>
 <ul>
-<li>Explore building permit trends over time via intuitive time-series visualizations.</li>
-<li>Interactively filter and analyze permits by type using real-time Dash callbacks.</li>
-<li>View spatial distributions of permits on NYC maps with aggregated and quarterly views.</li>
-<li>Leverage best engineering practices with a modular codebase and clean separation of concerns.</li>
+<li><strong>Interactive Time-Series Analysis:</strong> Easily chart permit issuance over time with dynamic, user-friendly visualizations.</li>
+<li><strong>Choropleth Mapping:</strong> Visualize the geographic footprint of permits across NYC with detailed, hexagonal maps.</li>
+<li><strong>Dynamic Filtering:</strong> Adjust views instantly by permit type and time period via intuitive controls.</li>
+<li><strong>Robust Engineering:</strong> A modular architecture ensures scalability, maintainability, and a smooth user experience.</li>
 </ul>
-<p>This application not only demonstrates proficiency in data science but also showcases robust web development skills.</p>
 <hr>
 </section>
 <section id="features" class="level2">
 <h2 class="anchored" data-anchor-id="features">Features</h2>
 <ul>
-<li><strong>Interactive Time-Series Analysis:</strong> Visualize permit issuance trends with dynamic annotations for selected time ranges.</li>
-<li><strong>Choropleth Mapping:</strong> Explore detailed and aggregated maps of NYC building permits using a hexagonal spatial grid.</li>
-<li><strong>Dynamic Filtering:</strong> Easily switch between permit types and time periods with radio buttons, sliders, and dropdown menus.</li>
-<li><strong>Modular Design:</strong> Clean separation between layout, callbacks, configuration, and data processing for maintainability and scalability.</li>
-<li><strong>Logging &amp; Debugging:</strong> Built-in logging and a hidden debug panel to facilitate troubleshooting during development.</li>
+<li><strong>Responsive Visualizations:</strong> Enjoy real-time updates and crisp graphics that bring urban data to life.</li>
+<li><strong>Geospatial Mapping:</strong> Innovative mapping techniques render complex spatial data in an accessible format.</li>
+<li><strong>Optimized Data Processing:</strong> Leverages intelligent aggregation and filtering to handle large datasets efficiently.</li>
+<li><strong>Modular Codebase:</strong> Each component is separated by concerns, making customizations and future enhancements a breeze.</li>
+<li><strong>Debug-Friendly:</strong> Comprehensive logging and in-built debugging tools streamline development and troubleshooting.</li>
 </ul>
 <hr>
 </section>
@@ -128,15 +127,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> venv venv</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> venv/bin/activate  <span class="co"># On Windows use: venv\Scripts\activate</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div></li>
 <li><p><strong>Install Dependencies:</strong></p>
-<p>The dependencies are managed via a <code>pyproject.toml</code> file. Install them using [pip]:</p>
+<p>The dependencies are managed via a <code>pyproject.toml</code> file. Install them using:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-e</span> .</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Alternatively, if you use a requirements file generated from your project configuration, run:</p>
+<p>Alternatively, if you use a requirements file:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-r</span> requirements.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div></li>
 <li><p><strong>Verify Data Files:</strong></p>
-<p>Ensure the processed data is located in the <code>data/processed</code> directory. This data includes:</p>
+<p>Ensure the processed data is located in the <code>data/processed</code> directory. This should include:</p>
 <ul>
 <li><code>nyc_hexes.geojson</code> – the geospatial grid for NYC</li>
-<li><code>permits_wide.csv</code> – the permit counts data</li>
+<li><code>permits_wide.csv</code> – permit counts data</li>
 </ul></li>
 </ol>
 <hr>
@@ -146,62 +145,61 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="usage">Usage</h2>
 <p>To launch the dashboard locally, run:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> src/app.py</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>The app will start on <a href="http://127.0.0.1:8050">http://127.0.0.1:8050</a>. Open this link in your browser to interact with the dashboard.</p>
+<p>The app will start on <a href="http://127.0.0.1:8050">http://127.0.0.1:8050</a>. Open this link in your browser to explore the dashboard.</p>
 <hr>
 </section>
 <section id="project-structure" class="level2">
 <h2 class="anchored" data-anchor-id="project-structure">Project Structure</h2>
 <pre><code>.
 ├── assets
-│&nbsp;&nbsp; ├── background.png         # Image assets
-│&nbsp;&nbsp; └── style.css              # Custom CSS styles
+│   ├── background.png         # Image assets
+│   └── style.css              # Custom CSS styles
 ├── codebase.md                # Project tree view and documentation
 ├── data
-│&nbsp;&nbsp; └── processed              # Preprocessed geospatial and permit data
-│&nbsp;&nbsp;     ├── nyc_hexes.geojson
-│&nbsp;&nbsp;     └── permits_wide.csv
+│   └── processed              # Preprocessed geospatial and permit data
+│       ├── nyc_hexes.geojson
+│       └── permits_wide.csv
 ├── pyproject.toml             # Project configuration and dependency management
 ├── run_codeweaver.bat         # Batch script for documentation generation (Windows)
 ├── src
-│&nbsp;&nbsp; ├── app.py                 # Application entry point
-│&nbsp;&nbsp; ├── app_instance.py        # Dash app and server instance setup
-│&nbsp;&nbsp; ├── callbacks.py           # All interactive component callbacks
-│&nbsp;&nbsp; ├── config.py              # Configuration settings
-│&nbsp;&nbsp; ├── data_utils.py          # Data processing and visualization utility functions
-│&nbsp;&nbsp; ├── debug.py               # Debugging tools
-│&nbsp;&nbsp; └── layout.py              # Dashboard layout definitions
+│   ├── app.py                 # Application entry point
+│   ├── app_instance.py        # Dash app and server instance setup
+│   ├── callbacks.py           # Interactive component callbacks
+│   ├── config.py              # Configuration settings
+│   ├── data_utils.py          # Data processing and visualization utility functions
+│   ├── debug.py               # Debugging tools
+│   └── layout.py              # Dashboard layout definitions
 └── uv.lock                    # Dependency lock file</code></pre>
 <hr>
 </section>
 <section id="technology-stack" class="level2">
 <h2 class="anchored" data-anchor-id="technology-stack">Technology Stack</h2>
 <ul>
-<li><strong>Python</strong> – Core programming language.</li>
-<li><strong>Dash &amp; Plotly</strong> – For creating interactive web-based visualizations.</li>
-<li><strong>GeoPandas &amp; Pandas</strong> – For data manipulation and geospatial analysis.</li>
-<li><strong>Dash Bootstrap Components</strong> – For responsive and attractive UI components.</li>
-<li><strong>Uvicorn &amp; ASGI</strong> – (Optional) For deploying the app in an asynchronous production setting.</li>
+<li><strong>Python</strong> – Primary programming language.</li>
+<li><strong>Dash &amp; Plotly</strong> – For crafting interactive, web-based visualizations.</li>
+<li><strong>GeoPandas &amp; Pandas</strong> – Efficiently handle data manipulation and geospatial analysis.</li>
+<li><strong>Dash Bootstrap Components</strong> – For responsive, attractive UI designs.</li>
+<li><strong>Uvicorn &amp; ASGI</strong> – (Optional) For deploying the app in an asynchronous production environment.</li>
 </ul>
 <hr>
 </section>
-<section id="data-science-development-highlights" class="level2">
-<h2 class="anchored" data-anchor-id="data-science-development-highlights">Data Science &amp; Development Highlights</h2>
+<section id="technical-highlights" class="level2">
+<h2 class="anchored" data-anchor-id="technical-highlights">Technical Highlights</h2>
 <ul>
-<li><strong>Advanced Data Manipulation:</strong> Efficient aggregation and transformation of permit data, including time-series grouping and dynamic geospatial mapping.</li>
-<li><strong>Interactive Visualization:</strong> Real-time updates across multiple charts and maps with advanced Dash callbacks.</li>
-<li><strong>Modular and Scalable Codebase:</strong> Leveraging best practices in software engineering by separating concerns into distinct modules (data utilities, layout, callbacks, configuration).</li>
-<li><strong>Logging &amp; Debugging:</strong> Comprehensive logging throughout the data processing pipeline, facilitating easier identification and resolution of issues.</li>
-<li><strong>Deployment Ready:</strong> Configured for local debugging with potential for asynchronous deployment using ASGI and Uvicorn.</li>
+<li><strong>Optimized Data Handling:</strong> Efficient processing pipelines to work with extensive datasets without lag.</li>
+<li><strong>Interactive Analytics:</strong> Visualization techniques geared toward clarity and precision for urban data insights.</li>
+<li><strong>Scalable Architecture:</strong> A modular setup that supports seamless updates and feature integrations.</li>
+<li><strong>Built-in Debugging:</strong> Extensive logging and debugging capabilities shorten the development cycle.</li>
 </ul>
 <hr>
 </section>
 <section id="contributing" class="level2">
 <h2 class="anchored" data-anchor-id="contributing">Contributing</h2>
-<p>Contributions, issues, and feature requests are welcome! Feel free to check the <a href="https://github.com/yourusername/nyc-building-permit-dashboard/issues">issues page</a>.</p>
+<p>Contributions, issues, and feature requests are welcome! Feel free to check the <a href="https://github.com/yourusername/nyc-building-permit-dashboard/issues">issues page</a> to report bugs or propose improvements.</p>
 <ol type="1">
 <li>Fork the repository.</li>
 <li>Create a new branch (<code>git checkout -b feature/your-feature</code>).</li>
-<li>Commit your changes (<code>git commit -m 'Add some feature'</code>).</li>
+<li>Commit your changes (<code>git commit -m 'Add new feature'</code>).</li>
 <li>Push to your branch (<code>git push origin feature/your-feature</code>).</li>
 <li>Open a Pull Request.</li>
 </ol>
@@ -214,9 +212,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="author" class="level2">
 <h2 class="anchored" data-anchor-id="author">Author</h2>
-<p>Created by <a href="https://daveleather.com">David Leather</a>. Explore more of my work and connect with me on <a href="https://github.com/dleather">GitHub</a>.</p>
+<p>Created by <a href="https://daveleather.com">David Leather</a>. Explore more work and connect on <a href="https://github.com/dleather">GitHub</a>.</p>
 <hr>
-<p>Happy coding!</p>
+<p>Happy exploring!</p>
 </section>
 </section>
 
