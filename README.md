@@ -6,6 +6,7 @@ An interactive dashboard for exploring and monitoring NYC building permit data. 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![codecov](https://codecov.io/gh/dleather/nyc_building_permit_dashboard/branch/main/graph/badge.svg)](https://codecov.io/gh/dleather/nyc_building_permit_dashboard)
 [![CI & Coverage](https://github.com/dleather/nyc_building_permit_dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/dleather/nyc_building_permit_dashboard/actions/workflows/ci.yml)
+[![Live Dashboard](https://img.shields.io/badge/dashboard-live-brightgreen)](https://nyc-permits-dashboard.daveleather.com/)
 
 ---
 
@@ -18,15 +19,52 @@ The **NYC Building Permit Dashboard** is a responsive web application built with
 - **Dynamic Filtering:** Adjust views instantly by permit type and time period via intuitive controls.
 - **Robust Engineering:** A modular architecture ensures scalability, maintainability, and a smooth user experience.
 
+![Dashboard Preview](dashboard.png)
+
 ---
 
 ## Features
 
-- **Responsive Visualizations:** Enjoy real-time updates and crisp graphics that bring urban data to life.
-- **Geospatial Mapping:** Innovative mapping techniques render complex spatial data in an accessible format.
-- **Optimized Data Processing:** Leverages intelligent aggregation and filtering to handle large datasets efficiently.
-- **Modular Codebase:** Each component is separated by concerns, making customizations and future enhancements a breeze.
-- **Debug-Friendly:** Comprehensive logging and in-built debugging tools streamline development and troubleshooting.
+- **Synchronized Interactive Maps:**
+  - Dual map views with synchronized panning, zooming, and rotation
+  - Square and lasso selection tools for precise area analysis
+  - Real-time synchronization between aggregated and quarterly views
+
+- **Advanced Data Selection:**
+  - Interactive hex-based geographic selection
+  - Cross-filtering between time series and map views
+  - Persistent selections across view changes
+
+- **Intuitive Controls:**
+  - Play/pause animation controls for temporal analysis
+  - Adjustable animation speed and time range
+  - One-click clearing of selections and filters
+  - Customizable color scale controls for data visualization
+
+- **Responsive Visualizations:** 
+  - Real-time updates and crisp graphics that bring urban data to life
+  - Automatic scaling and layout adjustment for all screen sizes
+  - Smooth transitions between different data views
+
+- **Advanced Geospatial Mapping:** 
+  - Hexagonal binning using Uber's H3 library for precise spatial analysis
+  - Multiple selection tools for detailed area studies
+  - Synchronized dual-map interface for comparative analysis
+
+- **Optimized Data Processing:** 
+  - Intelligent aggregation and filtering for large datasets
+  - Efficient handling of temporal and spatial data
+  - Real-time updates without performance lag
+
+- **Modular Architecture:**
+  - Clean separation of concerns for easy maintenance
+  - Event-driven design for responsive interactions
+  - Extensible component structure for future enhancements
+
+- **Developer-Friendly:**
+  - Comprehensive logging system
+  - Built-in debugging tools
+  - Clear callback structure for easy modifications
 
 ---
 

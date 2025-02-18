@@ -2,7 +2,7 @@ body {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 12px;
   /* do not increase min-width as some may use split screens */
-  min-width: 800px;
+  /* min-width: 800px; */
   color: #999;
 }
 
@@ -350,4 +350,10 @@ div.media {
 /* Optional: style for the selected option */
 .dark-dropdown__option--is-selected {
   background-color: #555;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;  /* hides any accidental horizontal scrolling */
 }

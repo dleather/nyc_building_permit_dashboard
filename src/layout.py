@@ -12,7 +12,9 @@ layout = dbc.Container(
     style={
         'backgroundColor': 'rgb(10, 10, 10)',
         'color': 'rgba(255, 255, 255, 0.8)',
-        'minHeight': '100vh'
+        'minHeight': '100vh',   # ensures full height
+        'maxWidth': '100vw',    # forces container to fill viewport width
+        'padding': '0'          # removes extra padding if not desired
     },
     children=[
         # Header
@@ -34,9 +36,17 @@ layout = dbc.Container(
                         className="text-center mb-2",
                         style={'color': 'rgba(255, 255, 255, 0.8)'}
                     ),
-                    dcc.Graph(id='time-series', style={'width': '100%', 'height': '400px'})
+                    dcc.Graph(
+                        id='time-series',
+                        config={'responsive': True},
+                        style={
+                            'width': '100%',
+                            'height': '35vh',
+                            'minHeight': '300px'
+                        }
+                    )
                 ]),
-                width=8
+                xs=12, sm=12, md=8  # Responsive breakpoints
             ),
             # Controls column
             dbc.Col(
@@ -172,7 +182,8 @@ layout = dbc.Container(
                     'padding': '20px',
                     'height': '100%'
                 }),
-                width=4
+                xs=12, sm=12, md=4,  # Responsive breakpoints
+                className="mt-3 mt-md-0"  # Add margin top on mobile
             )
         ]),
 
@@ -184,9 +195,13 @@ layout = dbc.Container(
                         className="text-center mb-2",
                         style={'color': 'rgba(255, 255, 255, 0.8)'}
                     ),
-                    dcc.Graph(id='map-aggregated')
+                    dcc.Graph(id='map-aggregated', style={
+                        'width': '100%',
+                        'height': '45vh',
+                        'minHeight': '350px'
+                    })
                 ]),
-                width=6
+                xs=12, sm=12, md=6  # Responsive breakpoints
             ),
             dbc.Col(
                 html.Div([
@@ -194,9 +209,13 @@ layout = dbc.Container(
                         className="text-center mb-2",
                         style={'color': 'rgba(255, 255, 255, 0.8)'}
                     ),
-                    dcc.Graph(id='map-quarterly')
+                    dcc.Graph(id='map-quarterly', style={
+                        'width': '100%',
+                        'height': '45vh',
+                        'minHeight': '350px'
+                    })
                 ]),
-                width=6
+                xs=12, sm=12, md=6  # Responsive breakpoints
             )
         ], className="my-3"),
 
