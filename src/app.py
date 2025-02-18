@@ -18,10 +18,10 @@ from src.layout import layout
 app.layout = layout
 from src import callbacks
 
-# Import callbacks (this registers them)
-#asgi_app = WsgiToAsgi(server)
+# Ensure asgi_app is defined at the module level
+asgi_app = WsgiToAsgi(server)
 
 if __name__ == "__main__":
-    app.run_server(debug=True, port=8050)
-    #import uvicorn
-    #uvicorn.run("src.app:asgi_app", host="127.0.0.1", port=8000, reload=True) 
+    # app.run_server(debug=True, port=8050)  # Disable this for production
+    import uvicorn
+    uvicorn.run("src.app:asgi_app", host="0.0.0.0", port=8000)  # Use a production server 
