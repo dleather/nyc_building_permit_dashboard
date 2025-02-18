@@ -2,8 +2,9 @@
 
 An interactive dashboard for exploring and monitoring NYC building permit data. This project harnesses modern web development tools and sophisticated data processing techniques to deliver dynamic insights into permit issuance trends and geographic distributions across New York City.
 
-[![Python Version](https://img.shields.io/badge/python->=3.13-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-%3E=3.13-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![codecov](https://codecov.io/gh/dleather/nyc_building_permit_dashboard/branch/main/graph/badge.svg)](https://codecov.io/gh/dleather/nyc_building_permit_dashboard)
 
 ---
 
