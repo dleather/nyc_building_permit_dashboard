@@ -21,4 +21,4 @@ def test_app_layout(dash_duo):
     assert "Controls" in dash_duo.find_element("body").text
 
 # When initializing Chrome, use:
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+# driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))

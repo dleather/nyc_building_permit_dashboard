@@ -15,7 +15,12 @@ def dash_app():
 def pytest_setup_options():
     from selenium.webdriver.chrome.options import Options
     options = Options()
-    options.binary_location = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    options.add_argument('--no-sandbox')
+    options.add_argument('--headless')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    # Use a temporary directory for user data
+    options.add_argument('--user-data-dir=/tmp/chrome-data')
     return options
 
 def pytest_configure():
@@ -25,7 +30,7 @@ def patched_get_chrome(self):
     # Get Chrome options correctly from the list
     options = self._options[0] if self._options else webdriver.ChromeOptions()
     # Set explicit ChromeDriver version
-    service = Service(ChromeDriverManager(driver_version="132.0.6834.197").install())
+    service = Service(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=options)
 
 # Patch the _get_chrome method in dash.testing.browser.Browser.
