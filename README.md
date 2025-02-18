@@ -5,6 +5,7 @@ An interactive dashboard for exploring and monitoring NYC building permit data. 
 [![Python Version](https://img.shields.io/badge/python-%3E=3.13-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![codecov](https://codecov.io/gh/dleather/nyc_building_permit_dashboard/branch/main/graph/badge.svg)](https://codecov.io/gh/dleather/nyc_building_permit_dashboard)
+[![CI & Coverage](https://github.com/dleather/nyc_building_permit_dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/dleather/nyc_building_permit_dashboard/actions/workflows/ci.yml)
 
 ---
 
