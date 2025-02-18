@@ -5,7 +5,7 @@ An interactive dashboard for exploring and monitoring NYC building permit data. 
 [![Python Version](https://img.shields.io/badge/python-%3E=3.13-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![codecov](https://codecov.io/gh/dleather/nyc_building_permit_dashboard/branch/main/graph/badge.svg)](https://codecov.io/gh/dleather/nyc_building_permit_dashboard)
-[![CI & Coverage](https://github.com/dleather/nyc_building_permit_dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/dleather/nyc_building_permit_dashboard/actions/workflows/ci.yml)
+[![Tests](https://github.com/dleather/nyc_building_permit_dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/dleather/nyc_building_permit_dashboard/actions/workflows/ci.yml)
 
 ---
 
@@ -35,7 +35,7 @@ The **NYC Building Permit Dashboard** is a responsive web application built with
 ### Prerequisites
 
 - Python >= 3.13
-- [pip](https://pip.pypa.io/)
+- [uv](https://github.com/astral-sh/uv) - Modern Python package installer and resolver
 - (Optional) A virtual environment tool such as [venv](https://docs.python.org/3/library/venv.html) or [conda](https://docs.conda.io/).
 
 ### Setup Instructions
@@ -59,13 +59,13 @@ The **NYC Building Permit Dashboard** is a responsive web application built with
    The dependencies are managed via a `pyproject.toml` file. Install them using:
 
    ```bash
-   pip install -e .
+   uv pip install -e .
    ```
 
    Alternatively, if you use a requirements file:
 
    ```bash
-   pip install -r requirements.txt
+   uv pip install -r requirements.txt
    ```
 
 4. **Verify Data Files:**
