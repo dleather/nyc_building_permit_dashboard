@@ -25,7 +25,7 @@ import plotly.express as px
 import plotly.graph_objs as go
 from src.config import MAPBOX_STYLE
 
-# Data and helper functions
+# Import data utilities and helper functions
 from src.data_utils import (
     quarters,
     quarter_to_index,
@@ -44,6 +44,7 @@ from src.data_utils import (
 import numpy as np
 import pandas as pd
 
+# Set up logging
 logger = logging.getLogger(__name__)
 logger.info("=== Initial Data Check ===")
 logger.info(f"permit_counts_wide shape: {permit_counts_wide.shape}")
@@ -51,11 +52,12 @@ logger.info(f"permit_counts_wide columns: {permit_counts_wide.columns.tolist()}"
 logger.info(f"Sample of NB values: {permit_counts_wide['NB'].head()}")
 logger.info(f"NB column stats: min={permit_counts_wide['NB'].min()}, max={permit_counts_wide['NB'].max()}, mean={permit_counts_wide['NB'].mean():.2f}")
 
-# Add this to your layout somewhere
+# Hidden debug div for troubleshooting
 debug_div = html.Div([
     html.Pre(id='debug-output', style={'whiteSpace': 'pre-wrap'}),
 ], style={'display': 'none'})  # Set to 'block' to see debug output
 
+# Decorator for logging callback execution
 def log_callback(func):
     def wrapper(*args, **kwargs):
         ctx = dash.callback_context  # Get the context to see what triggered this callback
@@ -65,6 +67,7 @@ def log_callback(func):
         return func(*args, **kwargs)
     return wrapper
 
+# Debug callback to log map selections
 @app.callback(
     Output("dummy-output", "children"),
     [Input("map-quarterly", "selectedData"), Input("map-aggregated", "selectedData")],
@@ -75,9 +78,8 @@ def debug_map_selections(qtr_sel, agg_sel):
     logger.info("Quarterly selection: %s", qtr_sel)
     logger.info("Aggregated selection: %s", agg_sel)
     return ""
-# ------------------------------------------------------------------------------
-# 1) Aggragtor callback
-# ------------------------------------------------------------------------------
+
+# Main callback that handles all global filter updates
 @app.callback(
     [Output("global_filter", "data"),
      Output("scale-type-aggregated", "value"),
@@ -134,7 +136,7 @@ def aggregator_callback(
     new_agg_scale = current_agg_scale
     new_qtr_scale = current_qtr_scale
 
-    # 1) If the slider changed...
+    # Handle time range slider changes
     if "period-range-slider" in triggered_ids and slider_value is not None:
         if len(slider_value) == 2:
             start_idx, end_idx = slider_value
@@ -147,7 +149,7 @@ def aggregator_callback(
             if curr_idx < start_idx or curr_idx > end_idx:
                 new_filter["currentQuarterIndex"] = start_idx
 
-    # 2) If the permit changed...
+    # Handle permit type changes
     if "permit-type" in triggered_ids and permit_value is not None:
         new_filter["permitType"] = permit_value
         # Get default scales for this permit type
@@ -155,33 +157,33 @@ def aggregator_callback(
         new_agg_scale = defaults["aggregated"]
         new_qtr_scale = defaults["quarterly"]
 
-    # 3) If play/pause changed...
+    # Handle play/pause button clicks
     if "play-button" in triggered_ids:
         new_filter["play"] = True
     if "pause-button" in triggered_ids:
         new_filter["play"] = False
 
-    # 4) If speed changed...
+    # Handle animation speed changes
     if "speed-radio" in triggered_ids and speed_value is not None:
         new_filter["speed"] = speed_value
 
-    # 5) If interval ticked => advance quarter
+    # Handle animation interval ticks
     if "animation-interval" in triggered_ids:
         current_idx = new_filter.get("currentQuarterIndex", 0)
         start_idx   = new_filter.get("startQuarterIndex", 0)
         end_idx     = new_filter.get("endQuarterIndex", len(quarters) - 1)
         new_idx = current_idx + 1
-        # Example: wrap around or clamp
+        # Wrap around to start when reaching the end
         if new_idx > end_idx:
             new_idx = start_idx
         new_filter["currentQuarterIndex"] = new_idx
 
-    # 6) If a map selection changed => update selected hexes
+    # Handle map selection changes
     if any(t in triggered_ids for t in ["map-quarterly", "map-aggregated"]):
         qtr_trigger = ("map-quarterly" in triggered_ids)
         agg_trigger = ("map-aggregated" in triggered_ids)
 
-        # If the user triggered the quarterly map:
+        # Handle quarterly map selections
         if qtr_trigger and qtr_sel is not None and "points" in qtr_sel:
             idx_list = [pt["pointIndex"] for pt in qtr_sel["points"]]
             cur_q_idx = new_filter.get("currentQuarterIndex", 0)
@@ -195,7 +197,7 @@ def aggregator_callback(
                 selected_hexes = df_plot.loc[idx_list, "h3_index"].tolist()
                 new_filter["selectedHexes"] = selected_hexes
 
-        # If the user triggered the aggregated map:
+        # Handle aggregated map selections
         if agg_trigger and agg_sel is not None and "points" in agg_sel:
             idx_list = [pt["pointIndex"] for pt in agg_sel["points"]]
             start_idx = new_filter.get("startQuarterIndex", 0)
@@ -215,11 +217,11 @@ def aggregator_callback(
                 selected_hexes = df_agg.loc[idx_list, "h3_index"].tolist()
                 new_filter["selectedHexes"] = selected_hexes
 
-    # 7) If user clicked "Clear Hexes"
+    # Handle clear hexes button
     if "clear-hexes" in triggered_ids:
         new_filter["selectedHexes"] = []
 
-    # 8) If user clicked "Clear Time Range"
+    # Handle clear time range button
     if "clear-time-range" in triggered_ids:
         new_filter["startQuarterIndex"] = 0
         new_filter["endQuarterIndex"]   = len(quarters) - 1
@@ -229,17 +231,13 @@ def aggregator_callback(
     return new_filter, new_agg_scale, new_qtr_scale
 
 
-# ------------------------------------------------------------------------------
-# 2) CONTROL THE dcc.Interval (id="animation-interval") BASED ON "play" & "speed"
-# ------------------------------------------------------------------------------
+# Control animation interval based on play state and speed
 @app.callback(
     [Output("animation-interval", "disabled"),
      Output("animation-interval", "interval")],
     Input("global_filter", "data")
 )
 def control_animation_interval(global_filter):
-    # If play is False => disable the interval
-    # If play is True  => enable it and use the 'speed' from global_filter
     is_playing = global_filter.get("play", False)
     speed      = global_filter.get("speed", 1000)
     return (not is_playing, speed)
@@ -247,9 +245,7 @@ def control_animation_interval(global_filter):
 
 
 
-# ------------------------------------------------------------------------------
-# 3) UPDATE THE QUARTERLY MAP (id="map-quarterly") FROM GLOBAL_FILTER
-# ------------------------------------------------------------------------------
+# Update quarterly map based on global filter changes
 from src.data_utils import ensure_all_hexes, global_quarterly_99, all_hexes
 
 @app.callback(
@@ -266,7 +262,7 @@ def update_quarterly_map(global_filter, map_view, scale_type):
     current_idx = global_filter.get("currentQuarterIndex", 0)
     selected_hexes = global_filter.get("selectedHexes", [])
     
-    # Determine the root value based on permit type as a default, if needed.
+    # Default root values for different permit types
     default_root = {
         "NB": 3,
         "DM": 2,
@@ -276,14 +272,14 @@ def update_quarterly_map(global_filter, map_view, scale_type):
         "ALL": 6
     }.get(permit_type, 3)
     
-    # Safeguard against out-of-bounds index
+    # Ensure current index is valid
     current_idx = min(current_idx, len(quarters) - 1)
     quarter_label = quarters[current_idx]
     
     logger.info(f"Permit type: {permit_type}")
     logger.info(f"Current quarter: {quarter_label}")
     
-    # Get data for the current quarter
+    # Get data for current quarter
     df_all = permit_counts_wide.loc[
         permit_counts_wide["period"] == quarter_label,
         ["h3_index", permit_type]  # Only select needed columns
@@ -292,20 +288,19 @@ def update_quarterly_map(global_filter, map_view, scale_type):
     df_plot = df_all.sort_values("h3_index").reset_index(drop=True)
     logger.info(f"Data shape for quarter: {df_plot.shape}")
     
-    # Calculate indices for selected hexes
+    # Handle selected hexes
     if not selected_hexes:
-        # Show all hexes as selected if empty
         selected_idx_list = df_plot.index.tolist()
     else:
         selected_idx_list = df_plot[df_plot["h3_index"].isin(selected_hexes)].index.tolist()
     
-    # Compute max value for color scale based on current time range
+    # Get max value for color scale
     slider_start = global_filter.get("startQuarterIndex", 0)
     slider_end = global_filter.get("endQuarterIndex", len(quarters) - 1)
     zmax_quarterly = get_global_max_for_permit_type(permit_type, slider_start, slider_end)
     logger.info(f"Computed zmax_quarterly: {zmax_quarterly}")
     
-    # Map the dropdown scale option into transformation parameters.
+    # Map scale type to transformation parameters
     if scale_type in {"sqrt", "cube-root", "4th-root", "5th-root", "6th-root"}:
         root_mapping = {"sqrt": 2, "cube-root": 3, "4th-root": 4, "5th-root": 5, "6th-root": 6}
         force_scale = "root"
@@ -320,6 +315,7 @@ def update_quarterly_map(global_filter, map_view, scale_type):
         force_scale = "linear"
         root_n = None
 
+    # Build the choropleth map
     fig = build_single_choropleth_map(
         df_plot, 
         permit_type, 
@@ -330,6 +326,7 @@ def update_quarterly_map(global_filter, map_view, scale_type):
     )
     fig.update_traces(selectedpoints=selected_idx_list)
     
+    # Update map view if needed
     if map_view:
         fig.update_layout(
             mapbox=dict(
@@ -344,9 +341,7 @@ def update_quarterly_map(global_filter, map_view, scale_type):
     return fig
 
 
-# ------------------------------------------------------------------------------
-# 4) UPDATE THE AGGREGATED MAP (id="map-aggregated") FROM GLOBAL_FILTER
-# ------------------------------------------------------------------------------
+# Update aggregated map based on global filter changes
 @app.callback(
     Output("map-aggregated", "figure"),
     [
@@ -367,6 +362,7 @@ def update_aggregated_map(global_filter, map_view, scale_type):
     logger.info(f"Permit type: {permit_type}")
     logger.info(f"Date range: {start_label} to {end_label}")
     
+    # Get data for selected time range
     df_sub = permit_counts_wide.loc[
         (permit_counts_wide["period"] >= start_label) &
         (permit_counts_wide["period"] <= end_label)
@@ -378,6 +374,7 @@ def update_aggregated_map(global_filter, map_view, scale_type):
     if df_sub.empty:
         return px.choropleth_mapbox()
     
+    # Aggregate data by hex
     df_agg = df_sub.groupby("h3_index", as_index=False)[permit_type].sum()
     logger.info(f"Aggregated data shape: {df_agg.shape}")
     logger.info(f"Aggregated {permit_type} stats: min={df_agg[permit_type].min()}, max={df_agg[permit_type].max()}, mean={df_agg[permit_type].mean():.2f}")
@@ -386,14 +383,14 @@ def update_aggregated_map(global_filter, map_view, scale_type):
     aggregated_zmax = df_agg[permit_type].max()
     logger.info(f"Final zmax value: {aggregated_zmax}")
     
+    # Handle selected hexes
     selected_hexes = global_filter.get("selectedHexes", [])
     if not selected_hexes:
-        # Show all hexes as selected if empty
         selected_idx_list = df_plot.index.tolist()
     else:
         selected_idx_list = df_plot[df_plot["h3_index"].isin(selected_hexes)].index.tolist()
     
-    # Map the dropdown scale option into transformation parameters.
+    # Map scale type to transformation parameters
     if scale_type in {"sqrt", "cube-root", "4th-root", "5th-root", "6th-root"}:
         root_mapping = {"sqrt": 2, "cube-root": 3, "4th-root": 4, "5th-root": 5, "6th-root": 6}
         force_scale = "root"
@@ -408,6 +405,7 @@ def update_aggregated_map(global_filter, map_view, scale_type):
         force_scale = "linear"
         root_n = None
 
+    # Build the choropleth map
     fig = build_single_choropleth_map(
         df_plot, 
         permit_type, 
@@ -418,6 +416,7 @@ def update_aggregated_map(global_filter, map_view, scale_type):
     )
     fig.update_traces(selectedpoints=selected_idx_list)
     
+    # Update map view if needed
     if map_view:
         fig.update_layout(
             mapbox=dict(
@@ -432,9 +431,7 @@ def update_aggregated_map(global_filter, map_view, scale_type):
     return fig
 
 
-# ------------------------------------------------------------------------------
-# 5) OPTIONAL: UPDATE THE TIME-SERIES ITSELF
-# ------------------------------------------------------------------------------
+# Update time series plot based on global filter changes
 @app.callback(
     Output("time-series", "figure"),
     Input("global_filter", "data")
@@ -446,30 +443,27 @@ def update_time_series(global_filter):
     current_idx = global_filter.get("currentQuarterIndex", 0)
     selected_hexes = global_filter.get("selectedHexes", [])
 
-    # 1) Filter data based on selected hexes if any
+    # Filter data based on selected hexes
     if selected_hexes:
         df_filtered = permit_counts_wide[permit_counts_wide["h3_index"].isin(selected_hexes)]
     else:
         df_filtered = permit_counts_wide
 
-    # 2) Aggregate by quarter
+    # Aggregate by quarter
     agg_ts = df_filtered.groupby("period")[permit_type].sum().reset_index()
     agg_ts["quarter_idx"] = agg_ts["period"].map(quarter_to_index)
 
-    # 3) Create the time series figure with dark theme
+    # Create time series plot
     selected_range = [start_idx, end_idx] if (start_idx != 0 or end_idx != len(quarters) - 1) else None
     fig = create_time_series_figure(agg_ts, permit_type, selected_range)
 
-    # 4) Add a vertical dashed line for the current quarter
+    # Add current quarter indicator
     if 0 <= current_idx < len(quarters):
         current_quarter_label = quarters[current_idx]
-        # If that quarter actually exists in agg_ts['period']:
         if current_quarter_label in agg_ts["period"].values:
-            # We can find the y-max
             ymax = agg_ts[permit_type].max() if not agg_ts.empty else 1
             
-            # Add white outline effect by creating two lines
-            # First, add a slightly thicker white line behind
+            # Add white outline for better visibility
             fig.add_shape(
                 type="line",
                 x0=current_quarter_label,
@@ -477,15 +471,15 @@ def update_time_series(global_filter):
                 y0=0,
                 y1=ymax,
                 line=dict(
-                    color="rgba(255, 255, 255, 0.5)",  # semi-transparent white
-                    width=4,  # slightly thicker than the blue line
+                    color="rgba(255, 255, 255, 0.5)",
+                    width=4,
                     dash="dash"
                 ),
                 xref="x",
                 yref="y"
             )
             
-            # Then add the blue line on top
+            # Add blue indicator line
             fig.add_shape(
                 type="line",
                 x0=current_quarter_label,
@@ -493,7 +487,7 @@ def update_time_series(global_filter):
                 y0=0,
                 y1=ymax,
                 line=dict(
-                    color="rgba(66, 135, 245, 0.8)",  # semi-transparent blue
+                    color="rgba(66, 135, 245, 0.8)",
                     width=2,
                     dash="dash"
                 ),
@@ -504,7 +498,7 @@ def update_time_series(global_filter):
     return fig
 
 
-
+# Update titles based on selected permit type and time range
 @app.callback(
     [Output("map-quarterly-title", "children"),
      Output("map-aggregated-title", "children"),
@@ -520,28 +514,24 @@ def update_titles(global_filter):
     start_label = quarters[start_idx]
     end_label = quarters[end_idx]
     
-    # Compute the titles for each section
     quarterly_title = f"{permit_label} Permits Issued Across Space and Time"
     aggregated_title = f"{permit_label} Permits Issued from {start_label} - {end_label}"
     time_series_title = f"Time-Series of {permit_label}"
     
     return quarterly_title, aggregated_title, time_series_title
 
+# Reset time range when clear button is clicked
 @app.callback(
     Output("period-range-slider", "value"),
     Input("clear-time-range", "n_clicks"),
     prevent_initial_call=True
 )
 def reset_time_range(n_clicks):
-    """
-    When the user clicks the Clear Time Range button,
-    reset the slider to [0, len(quarters) - 1].
-    """
     if n_clicks:
         return [0, len(quarters) - 1]
-    # If for some reason it's triggered without clicks, do nothing
     return dash.no_update
 
+# Sync map views between quarterly and aggregated maps
 @app.callback(
     Output("map_view_store", "data"),
     Input("map-aggregated", "relayoutData"),
@@ -550,30 +540,15 @@ def reset_time_range(n_clicks):
     prevent_initial_call=True
 )
 def update_map_view(agg_relayout, qtr_relayout, current_view):
-    """
-    Whenever the user pans or zooms on either map,
-    capture the new center/zoom/bearing/pitch from relayoutData
-    and store them in map_view_store.data so that the other map
-    can match it.
-    """
     ctx = dash.callback_context
 
     if not ctx.triggered:
-        return current_view  # no change
+        return current_view
 
-    # Figure out which map triggered the callback
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    # Utility to parse the new center/zoom from relayoutData
+    # Helper function to parse map view parameters
     def parse_mapbox_view(rld):
-        # Typically rld might have keys like:
-        # {
-        #   'mapbox.center': {'lon': -73.91, 'lat': 40.77},
-        #   'mapbox.zoom': 10.2,
-        #   'mapbox.pitch': 0,
-        #   'mapbox.bearing': 0,
-        #   ...
-        # }
         updated = {}
         if not rld:
             return {}
@@ -587,33 +562,28 @@ def update_map_view(agg_relayout, qtr_relayout, current_view):
             updated['pitch'] = rld['map.pitch']
         return updated
 
-    # Grab whichever relayoutData is available from the triggered map
+    # Get new view parameters from triggered map
     new_view = {}
     if trigger_id == "map-aggregated" and agg_relayout:
         new_view = parse_mapbox_view(agg_relayout)
     elif trigger_id == "map-quarterly" and qtr_relayout:
         new_view = parse_mapbox_view(qtr_relayout)
 
-    # Merge the new view parameters into the existing store
+    # Update view store
     updated_view = {} if current_view is None else current_view.copy()
     updated_view.update(new_view)
 
     return updated_view
 
+# Helper function to build choropleth maps
 def build_single_choropleth_map(df_plot, permit_type, map_title, zmax_override=None, force_scale=None, root_n=3):
-    """
-    Build a single choropleth map with improved color scaling.
-    force_scale: None, 'root', or 'log' to force a specific scale type
-    root_n: The root to use for root scaling (e.g., 2 for square root, 3 for cube root)
-    """
-    # Get the values for color scaling
+    # Get values for color scaling
     values = df_plot[permit_type]
     
-    # Initialize tick values and text as None
     tick_vals = None
     tick_text = None
     
-    # Determine scale type
+    # Determine scale type and transformation
     if force_scale:
         use_scale = force_scale
     else:
@@ -623,24 +593,20 @@ def build_single_choropleth_map(df_plot, permit_type, map_title, zmax_override=N
     if use_scale == 'root':
         zmin = 0
         zmax = zmax_override if zmax_override is not None else values.max()
-        # Transform values for coloring but keep original for labels
         z_display = np.power(values, 1/root_n)
         z_max_transformed = np.power(zmax, 1/root_n)
         
-        # Create tick values that will show untransformed numbers
         n_ticks = 5
         tick_vals = np.linspace(0, z_max_transformed, n_ticks)
         tick_text = [f"{int(val**root_n)}" for val in tick_vals]
         suffix = ""
         
     elif use_scale == 'log':
-        # Add small epsilon to avoid log(0)
         epsilon = 1e-10
         zmin = np.log10(epsilon)
         zmax = np.log10(zmax_override if zmax_override is not None else values.max() + epsilon)
         z_display = np.log10(values + epsilon)
         
-        # Create tick values that will show untransformed numbers
         tick_vals = np.linspace(zmin, zmax, 5)
         tick_text = [f"{int(10**val)}" for val in tick_vals]
         suffix = ""
@@ -662,9 +628,10 @@ def build_single_choropleth_map(df_plot, permit_type, map_title, zmax_override=N
         z_display = values
         suffix = ""
 
-    # Get color scale parameters (using linear scale since we pre-transformed the values)
+    # Get color scale
     _, _, colorscale, _ = get_colorscale_params(values, False)
 
+    # Set up colorbar
     colorbar_dict = dict(
         title=dict(
             text=f"Count{suffix}",
@@ -674,14 +641,13 @@ def build_single_choropleth_map(df_plot, permit_type, map_title, zmax_override=N
         bgcolor='rgba(0,0,0,0)'
     )
 
-    # Only add tick values and text if they were set
     if tick_vals is not None and tick_text is not None:
         colorbar_dict.update(dict(
             ticktext=tick_text,
             tickvals=tick_vals
         ))
 
-    # Create the choropleth trace
+    # Create choropleth map
     fig = go.Figure(
         go.Choroplethmapbox(
             geojson=hex_geojson,
@@ -707,7 +673,7 @@ def build_single_choropleth_map(df_plot, permit_type, map_title, zmax_override=N
         )
     )
     
-    # Rest of the layout remains the same
+    # Set layout
     fig.update_layout(
         title=dict(
             text=map_title, 

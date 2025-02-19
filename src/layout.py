@@ -1,23 +1,25 @@
-# src/layout.py
+# Main layout file for the NYC Permits Dashboard
+# Defines the structure and styling of the UI components
 
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 from src.config import ANIMATION_INTERVAL
 from src.data_utils import quarters, permit_options
 from src.debug import debug_div
-import dash_core_components as dcc  # ensure dcc is imported if not already
+import dash_core_components as dcc
 
+# Main container with dark theme styling
 layout = dbc.Container(
     fluid=True,
     style={
         'backgroundColor': 'rgb(10, 10, 10)',
         'color': 'rgba(255, 255, 255, 0.8)',
-        'minHeight': '100vh',   # ensures full height
-        'maxWidth': '100vw',    # forces container to fill viewport width
-        'padding': '0'          # removes extra padding if not desired
+        'minHeight': '100vh',
+        'maxWidth': '100vw',
+        'padding': '0'
     },
     children=[
-        # Header
+        # Dashboard title header
         dbc.Row(
             dbc.Col(
                 html.H1("NYC Permits Dashboard", 
@@ -28,8 +30,9 @@ layout = dbc.Container(
             )
         ),
 
-        # Top Row: Time-Series with Title
+        # Time series chart and control panel row
         dbc.Row([
+            # Time series visualization
             dbc.Col(
                 html.Div([
                     html.H3(id='time-series-title', 
@@ -46,15 +49,15 @@ layout = dbc.Container(
                         }
                     )
                 ]),
-                xs=12, sm=12, md=8  # Responsive breakpoints
+                xs=12, sm=12, md=8
             ),
-            # Controls column
+            # Control panel with filters and animation controls
             dbc.Col(
                 html.Div([
                     html.H4("Controls", style={'color': 'rgba(255, 255, 255, 0.8)'}),
                     html.Hr(style={'borderColor': 'rgba(255, 255, 255, 0.2)'}),
 
-                    # First row: Permit Type and Animation Speed
+                    # Permit type and animation speed controls
                     dbc.Row([
                         dbc.Col([
                             html.Label("Permit Type", style={'color': 'rgba(255, 255, 255, 0.7)'}),
@@ -84,7 +87,7 @@ layout = dbc.Container(
                         ], width=6)
                     ], className="mb-3"),
 
-                    # Second row: Aggregated Map Scale and Quarterly Map Scale (aligned vertically)
+                    # Map scale controls for both views
                     dbc.Row([
                         dbc.Col([
                             html.Label("Aggregated Map Scale", style={'color': 'rgba(255, 255, 255, 0.7)'}),
@@ -134,6 +137,7 @@ layout = dbc.Container(
                         ], width=6)
                     ]),
 
+                    # Time range slider and animation controls
                     html.Label("Select Time Range:", style={'color': 'rgba(255, 255, 255, 0.7)'}),
                     dcc.RangeSlider(
                         id="period-range-slider",
@@ -182,13 +186,14 @@ layout = dbc.Container(
                     'padding': '20px',
                     'height': '100%'
                 }),
-                xs=12, sm=12, md=4,  # Responsive breakpoints
-                className="mt-3 mt-md-0"  # Add margin top on mobile
+                xs=12, sm=12, md=4,
+                className="mt-3 mt-md-0"
             )
         ]),
 
-        # Bottom Row: Maps
+        # Dual map view row
         dbc.Row([
+            # Aggregated map
             dbc.Col(
                 html.Div([
                     html.H3(id='map-aggregated-title', 
@@ -201,8 +206,9 @@ layout = dbc.Container(
                         'minHeight': '350px'
                     })
                 ]),
-                xs=12, sm=12, md=6  # Responsive breakpoints
+                xs=12, sm=12, md=6
             ),
+            # Quarterly map
             dbc.Col(
                 html.Div([
                     html.H3(id='map-quarterly-title', 
@@ -215,11 +221,11 @@ layout = dbc.Container(
                         'minHeight': '350px'
                     })
                 ]),
-                xs=12, sm=12, md=6  # Responsive breakpoints
+                xs=12, sm=12, md=6
             )
         ], className="my-3"),
 
-        # Footer
+        # Attribution footer
         dbc.Row(
             dbc.Col(
                 html.Div([
@@ -238,7 +244,7 @@ layout = dbc.Container(
             )
         ),
 
-        # Hidden dcc.Store for Map View (holds current map center and zoom)
+        # State management stores and intervals
         dcc.Store(
             id='map_view_store',
             data={
@@ -248,8 +254,6 @@ layout = dbc.Container(
                 'pitch': 0
             }
         ),
-
-        # Existing Stores, Interval, and Debug Div
         dcc.Store(
             id='global_filter',
             data={
